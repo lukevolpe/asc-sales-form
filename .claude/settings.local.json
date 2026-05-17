@@ -7,7 +7,15 @@
       "WebFetch(domain:cdn.prod.website-files.com)",
       "Skill(to-issues)",
       "Skill(to-issues:*)",
-      "Bash(grep -E \"\\\\.\\(config|mjs|ts\\)$\")"
+      "Bash(grep -E \"\\\\.\\(config|mjs|ts\\)$\")",
+      "Bash(npx shadcn@latest init --base radix -y)",
+      "Bash(npm run *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(gh pr create --title 'feat: project foundation and tooling' --body ' *)",
+      "Bash(git push *)",
+      "PowerShell(git push -u origin issue-1-project-foundation 2>&1)",
+      "Bash(gh auth *)"
     ]
   }
 }

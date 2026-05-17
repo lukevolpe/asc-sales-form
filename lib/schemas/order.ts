@@ -85,15 +85,18 @@ export const orderFormSchema = z
         ctx.addIssue({ code: "custom", message: "Email is required", path: ["accountEmail"] })
       }
     }
-    if (data.invoiceSchedule.length > 0) {
-      const total = data.invoiceSchedule.reduce((sum, item) => sum + item.percentage, 0)
-      if (Math.round(total) !== 100) {
-        ctx.addIssue({
-          code: "custom",
-          message: "Invoice schedule percentages must sum to 100%",
-          path: ["invoiceSchedule"],
-        })
-      }
+    if (!data.salesperson?.trim()) {
+      ctx.addIssue({ code: "custom", message: "Salesperson is required", path: ["salesperson"] })
+    }
+    if (!data.requirementType?.trim()) {
+      ctx.addIssue({ code: "custom", message: "Type of requirement is required", path: ["requirementType"] })
+    }
+    if (
+      (data.requirementType === "Studio Project" ||
+        data.requirementType === "Advancement of Existing Website") &&
+      !data.requirementSubType?.trim()
+    ) {
+      ctx.addIssue({ code: "custom", message: "Sub-type is required", path: ["requirementSubType"] })
     }
   })
 

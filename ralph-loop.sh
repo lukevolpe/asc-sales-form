@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 if [ -z "${1:-}" ]; then
   echo "Usage: $0 <iterations>"
@@ -23,6 +23,11 @@ for ((i=1; i<=$1; i++)); do
     --output-format stream-json \
     "$(cat ralph-prompt.md)" \
   | tee "$logfile"
+  exit_code=${PIPESTATUS[0]}
+  if [ "$exit_code" -ne 0 ]; then
+    echo "Iteration $i: claude exited $exit_code — skipping to next iteration."
+    continue
+  fi
 
   if grep -q "<promise>COMPLETE</promise>" "$logfile"; then
     echo "Ralph complete after $i iterations."

@@ -85,6 +85,16 @@ export const orderFormSchema = z
         ctx.addIssue({ code: "custom", message: "Email is required", path: ["accountEmail"] })
       }
     }
+    if (data.invoiceSchedule.length > 0) {
+      const total = data.invoiceSchedule.reduce((sum, item) => sum + item.percentage, 0)
+      if (Math.round(total) !== 100) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Invoice schedule percentages must sum to 100%",
+          path: ["invoiceSchedule"],
+        })
+      }
+    }
   })
 
 export type OrderFormValues = z.infer<typeof orderFormSchema>

@@ -1,0 +1,1 @@
+[2026-05-17] Issue #1 — project foundation complete; installed all deps, shadcn/ui init (Nova/Radix/TW4), Inter font, #2C73D7 brand colour tokens, .env.example, page.tsx redirect to /orders; npm run build passes; PR #13 open

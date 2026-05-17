@@ -12,9 +12,17 @@ You are working on the Ascensor Sales Form project — an internal tool for subm
    Run: gh issue list --limit 20
    Priority order: architectural/schema work > integration points > core engine modules > API routes > UI > polish.
 
-   Then check for open PRs: gh pr list --limit 20
-   Skip any issue that already has an open PR — it is awaiting review, not your job this iteration.
-   Pick the highest-priority open issue with no open PR.
+   For each candidate (highest priority first), apply these filters in order — skip the issue if any filter fails:
+
+   a) Open PR check: gh pr list --limit 20
+      Skip if this issue already has an open PR awaiting review.
+
+   b) Dependency check: gh issue view <number> --json body
+      Look for a "Blocked by" line in the body (e.g. "Blocked by: #2, #5").
+      For each listed issue number, run: gh issue view <dep> --json state
+      Skip if any dependency is still open (not yet merged/closed).
+
+   Pick the first issue that passes both filters.
 
 2. Read the full issue body: gh issue view <number> --json title,body,labels,state,number
 
@@ -50,5 +58,5 @@ You are working on the Ascensor Sales Form project — an internal tool for subm
       git commit -m "chore: progress update (#<number>)"
       git push
 
-If you check the issue list and find that ALL issues are closed or all remaining ones have open PRs,
+If every remaining open issue is either awaiting PR review or blocked by unmerged work,
 output exactly: <promise>COMPLETE</promise>

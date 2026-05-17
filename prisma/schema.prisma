@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  // Customer Information (Step 1)
+  companyName String
+  contactName String
+  email       String
+  phone       String
+  isNewCustomer Boolean @default(false)
+  // New Customer Billing Address (Step 2, conditional)
+  billingLine1    String?
+  billingLine2    String?
+  billingTown     String?
+  billingCounty   String?
+  billingPostcode String?
+  billingCountry  String?
+  // Account Contact (Step 3, conditional)
+  accountSameAsCustomer Boolean  @default(true)
+  accountCompanyName    String?
+  accountContactName    String?
+  accountEmail          String?
+  // Sales Information (Step 4)
+  salesperson      String
+  requirementType  String
+  requirementSubType String?
+  // Rate & Costs (Step 6)
+  hourlyRate             Float   @default(110)
+  additionalOngoingCosts Float?
+  additionalOutcosts     Float?
+  // Project Details (Step 7)
+  projectName        String?
+  projectDescription String?
+  estimatedStartDate DateTime?
+  estimatedEndDate   DateTime?
+  // Metadata
+  submittedAt DateTime @default(now())
+  isAmended   Boolean  @default(false)
+
+  hoursEntries    HoursEntry[]
+  invoiceSchedule InvoiceScheduleItem[]
+}
+
+model HoursEntry {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  roleName     String
+  hours        Float?
+  setupHours   Float?
+  monthlyHours Float?
+  months       Int?
+}
+
+model InvoiceScheduleItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  monthOffset Int?
+  date        DateTime?
+  percentage  Float
+}

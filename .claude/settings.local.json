@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(grill-me)",
+      "WebFetch(domain:www.ascensor.co.uk)",
+      "WebFetch(domain:www.ascensor.com)",
+      "WebFetch(domain:cdn.prod.website-files.com)",
+      "Skill(to-issues)",
+      "Skill(to-issues:*)",
+      "Bash(grep -E \"\\\\.\\(config|mjs|ts\\)$\")"
+    ]
+  }
+}

@@ -1,17 +1,21 @@
 #!/bin/bash
 set -euo pipefail
 
-if [ -z "$1" ]; then
+if [ -z "${1:-}" ]; then
   echo "Usage: $0 <iterations>"
   exit 1
 fi
 
 mkdir -p logs
 
-final_result='select(.type == "result").result // empty'
-
 for ((i=1; i<=$1; i++)); do
   logfile="logs/iteration-$i.json"
+  echo "=== Iteration $i / $1 ==="
+
+  # Safety net: ensure we're on master before handing off to the agent.
+  # The agent prompt also does this, but belt-and-suspenders guards against
+  # a previous iteration that crashed mid-branch-switch.
+  git checkout master && git pull origin master
 
   docker sandbox run claude-asc-sales-form -- \
     --verbose \

@@ -85,6 +85,19 @@ export const orderFormSchema = z
         ctx.addIssue({ code: "custom", message: "Email is required", path: ["accountEmail"] })
       }
     }
+    if (!data.salesperson?.trim()) {
+      ctx.addIssue({ code: "custom", message: "Salesperson is required", path: ["salesperson"] })
+    }
+    if (!data.requirementType?.trim()) {
+      ctx.addIssue({ code: "custom", message: "Type of requirement is required", path: ["requirementType"] })
+    }
+    if (
+      (data.requirementType === "Studio Project" ||
+        data.requirementType === "Advancement of Existing Website") &&
+      !data.requirementSubType?.trim()
+    ) {
+      ctx.addIssue({ code: "custom", message: "Sub-type is required", path: ["requirementSubType"] })
+    }
   })
 
 export type OrderFormValues = z.infer<typeof orderFormSchema>

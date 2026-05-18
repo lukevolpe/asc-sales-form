@@ -42,6 +42,7 @@ model Order {
   // Metadata
   submittedAt DateTime @default(now())
   isAmended   Boolean  @default(false)
+  amendedAt   DateTime?
 
   hoursEntries    HoursEntry[]
   invoiceSchedule InvoiceScheduleItem[]

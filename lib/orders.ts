@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import type { Order, HoursEntry, InvoiceScheduleItem } from '@prisma/client'
+import type { OrderFormValues } from '@/lib/schemas/order'
 
 export type FullOrder = Order & {
   hoursEntries: HoursEntry[]
@@ -24,6 +25,52 @@ export type OrderListItem = {
   requirementType: string
   totalValue: number
   submittedAt: Date
+}
+
+export function orderToFormValues(order: FullOrder): OrderFormValues {
+  return {
+    companyName: order.companyName,
+    contactName: order.contactName,
+    email: order.email,
+    phone: order.phone,
+    isNewCustomer: order.isNewCustomer,
+    billingLine1: order.billingLine1 ?? '',
+    billingLine2: order.billingLine2 ?? '',
+    billingTown: order.billingTown ?? '',
+    billingCounty: order.billingCounty ?? '',
+    billingPostcode: order.billingPostcode ?? '',
+    billingCountry: order.billingCountry ?? '',
+    accountSameAsCustomer: order.accountSameAsCustomer,
+    accountCompanyName: order.accountCompanyName ?? '',
+    accountContactName: order.accountContactName ?? '',
+    accountEmail: order.accountEmail ?? '',
+    salesperson: order.salesperson,
+    requirementType: order.requirementType,
+    requirementSubType: order.requirementSubType ?? '',
+    hoursEntries: order.hoursEntries.map((e) => ({
+      roleName: e.roleName,
+      hours: e.hours ?? undefined,
+      setupHours: e.setupHours ?? undefined,
+      monthlyHours: e.monthlyHours ?? undefined,
+      months: e.months ?? undefined,
+    })),
+    hourlyRate: order.hourlyRate,
+    additionalOngoingCosts: order.additionalOngoingCosts ?? undefined,
+    additionalOutcosts: order.additionalOutcosts ?? undefined,
+    invoiceSchedule: order.invoiceSchedule.map((i) => ({
+      monthOffset: i.monthOffset ?? undefined,
+      date: i.date ? i.date.toISOString().split('T')[0] : undefined,
+      percentage: i.percentage,
+    })),
+    projectName: order.projectName ?? '',
+    projectDescription: order.projectDescription ?? '',
+    estimatedStartDate: order.estimatedStartDate
+      ? order.estimatedStartDate.toISOString().split('T')[0]
+      : '',
+    estimatedEndDate: order.estimatedEndDate
+      ? order.estimatedEndDate.toISOString().split('T')[0]
+      : '',
+  }
 }
 
 export async function listOrders(query?: string): Promise<OrderListItem[]> {

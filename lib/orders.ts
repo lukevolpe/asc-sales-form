@@ -2,6 +2,97 @@ import { db } from '@/lib/db'
 import type { Order, HoursEntry, InvoiceScheduleItem } from '@prisma/client'
 import type { OrderFormValues } from '@/lib/schemas/order'
 
+// ─── Order total ──────────────────────────────────────────────────────────────
+
+type OrderTotalInput = {
+  hourlyRate: number
+  additionalOngoingCosts?: number | null
+  additionalOutcosts?: number | null
+  hoursEntries: Array<{
+    hours?: number | null
+    setupHours?: number | null
+    monthlyHours?: number | null
+    months?: number | null
+  }>
+}
+
+export function calculateOrderTotal(order: OrderTotalInput): number {
+  const hoursValue = order.hoursEntries.reduce((sum, entry) => {
+    const oneOff = (entry.hours ?? 0) + (entry.setupHours ?? 0)
+    const recurring = (entry.monthlyHours ?? 0) * (entry.months ?? 1)
+    return sum + (oneOff + recurring) * order.hourlyRate
+  }, 0)
+  return hoursValue + (order.additionalOngoingCosts ?? 0) + (order.additionalOutcosts ?? 0)
+}
+
+// ─── Form → Prisma data builders ─────────────────────────────────────────────
+
+function buildScalarFields(v: OrderFormValues) {
+  return {
+    companyName: v.companyName,
+    contactName: v.contactName,
+    email: v.email,
+    phone: v.phone,
+    isNewCustomer: v.isNewCustomer,
+    billingLine1: v.billingLine1 || null,
+    billingLine2: v.billingLine2 || null,
+    billingTown: v.billingTown || null,
+    billingCounty: v.billingCounty || null,
+    billingPostcode: v.billingPostcode || null,
+    billingCountry: v.billingCountry || null,
+    accountSameAsCustomer: v.accountSameAsCustomer,
+    accountCompanyName: v.accountCompanyName || null,
+    accountContactName: v.accountContactName || null,
+    accountEmail: v.accountEmail || null,
+    salesperson: v.salesperson!,
+    requirementType: v.requirementType!,
+    requirementSubType: v.requirementSubType || null,
+    hourlyRate: v.hourlyRate,
+    additionalOngoingCosts: v.additionalOngoingCosts,
+    additionalOutcosts: v.additionalOutcosts,
+    projectName: v.projectName || null,
+    projectDescription: v.projectDescription || null,
+    estimatedStartDate: v.estimatedStartDate ? new Date(v.estimatedStartDate) : null,
+    estimatedEndDate: v.estimatedEndDate ? new Date(v.estimatedEndDate) : null,
+  }
+}
+
+function mapHoursEntries(entries: OrderFormValues['hoursEntries']) {
+  return entries.map((e) => ({
+    roleName: e.roleName,
+    hours: e.hours,
+    setupHours: e.setupHours,
+    monthlyHours: e.monthlyHours,
+    months: e.months,
+  }))
+}
+
+function mapInvoiceSchedule(schedule: OrderFormValues['invoiceSchedule']) {
+  return schedule.map((i) => ({
+    monthOffset: i.monthOffset,
+    date: i.date ? new Date(i.date) : undefined,
+    percentage: i.percentage,
+  }))
+}
+
+export function buildOrderCreateData(v: OrderFormValues) {
+  return {
+    ...buildScalarFields(v),
+    hoursEntries: { create: mapHoursEntries(v.hoursEntries) },
+    invoiceSchedule: { create: mapInvoiceSchedule(v.invoiceSchedule) },
+  }
+}
+
+export function buildOrderUpdateData(v: OrderFormValues) {
+  return {
+    ...buildScalarFields(v),
+    isAmended: true,
+    amendedAt: new Date(),
+    hoursEntries: { deleteMany: {}, create: mapHoursEntries(v.hoursEntries) },
+    invoiceSchedule: { deleteMany: {}, create: mapInvoiceSchedule(v.invoiceSchedule) },
+  }
+}
+
 export type FullOrder = Order & {
   hoursEntries: HoursEntry[]
   invoiceSchedule: InvoiceScheduleItem[]
@@ -90,18 +181,7 @@ export async function listOrders(query?: string): Promise<OrderListItem[]> {
   })
 
   return orders.map((order) => {
-    const hoursTotal = order.hoursEntries.reduce((sum, entry) => {
-      const h =
-        (entry.hours ?? 0) +
-        (entry.setupHours ?? 0) +
-        (entry.monthlyHours ?? 0) * (entry.months ?? 1)
-      return sum + h * order.hourlyRate
-    }, 0)
-
-    const totalValue =
-      hoursTotal +
-      (order.additionalOngoingCosts ?? 0) +
-      (order.additionalOutcosts ?? 0)
+    const totalValue = calculateOrderTotal(order)
 
     return {
       id: order.id,

@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { SUB_TYPE_REQUIRED_FOR } from '@/lib/constants/requirementTypes'
 
 export const orderFormSchema = z
   .object({
@@ -92,8 +93,7 @@ export const orderFormSchema = z
       ctx.addIssue({ code: "custom", message: "Type of requirement is required", path: ["requirementType"] })
     }
     if (
-      (data.requirementType === "Studio Project" ||
-        data.requirementType === "Advancement of Existing Website") &&
+      SUB_TYPE_REQUIRED_FOR.includes(data.requirementType ?? "") &&
       !data.requirementSubType?.trim()
     ) {
       ctx.addIssue({ code: "custom", message: "Sub-type is required", path: ["requirementSubType"] })

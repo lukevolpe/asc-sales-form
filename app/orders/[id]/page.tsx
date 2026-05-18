@@ -1,28 +1,17 @@
 import * as React from "react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { getOrder } from "@/lib/orders"
+import { getOrder, calculateOrderTotal } from "@/lib/orders"
 import type { FullOrder } from "@/lib/orders"
+import { formatCurrency } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import { SuccessBanner } from "@/components/success-banner"
 import { CopyTsvButton } from "@/components/copy-tsv-button"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(n)
-}
-
 function safeNum(n: number | null | undefined) {
   return Number.isFinite(n) ? (n ?? 0) : 0
-}
-
-function calcTotal(order: FullOrder): number {
-  const hoursTotal = order.hoursEntries.reduce((sum, e) => {
-    const h = safeNum(e.hours) + safeNum(e.setupHours) + safeNum(e.monthlyHours) * (safeNum(e.months) || 1)
-    return sum + h * order.hourlyRate
-  }, 0)
-  return hoursTotal + safeNum(order.additionalOngoingCosts) + safeNum(order.additionalOutcosts)
 }
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
@@ -61,7 +50,7 @@ function HoursTable({ order }: { order: FullOrder }) {
         <Row label="Studio hrs/month" value={String(safeNum(studio?.monthlyHours))} />
         <Row label="Marketing hrs/month" value={String(safeNum(marketing?.monthlyHours))} />
         <Row label="Months" value={String(months)} />
-        <Row label="Hours total value" value={fmt(total)} />
+        <Row label="Hours total value" value={formatCurrency(total)} />
       </div>
     )
   }
@@ -109,7 +98,7 @@ function HoursTable({ order }: { order: FullOrder }) {
                 ) : (
                   <td className="px-3 py-2">{safeNum(e.hours)}</td>
                 )}
-                <td className="px-3 py-2 text-right text-muted-foreground">{fmt(cost)}</td>
+                <td className="px-3 py-2 text-right text-muted-foreground">{formatCurrency(cost)}</td>
               </tr>
             )
           })}
@@ -119,7 +108,7 @@ function HoursTable({ order }: { order: FullOrder }) {
             <td className="px-3 py-2" colSpan={isTwoCol ? 3 : 2}>
               Total
             </td>
-            <td className="px-3 py-2 text-right">{fmt(grandTotal)}</td>
+            <td className="px-3 py-2 text-right">{formatCurrency(grandTotal)}</td>
           </tr>
         </tfoot>
       </table>
@@ -176,7 +165,7 @@ export default async function OrderPage({
   const order = await getOrder(id)
   if (!order) notFound()
 
-  const total = calcTotal(order)
+  const total = calculateOrderTotal(order)
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 space-y-6">
@@ -220,7 +209,7 @@ export default async function OrderPage({
         <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
           Total Order Value
         </p>
-        <p className="text-3xl font-bold text-brand">{fmt(total)}</p>
+        <p className="text-3xl font-bold text-brand">{formatCurrency(total)}</p>
       </div>
 
       {/* Customer */}
@@ -274,10 +263,10 @@ export default async function OrderPage({
       <SectionCard title="Rate & Costs">
         <Row label="Hourly rate" value={`£${order.hourlyRate}/hr`} />
         {safeNum(order.additionalOngoingCosts) > 0 && (
-          <Row label="Ongoing costs" value={fmt(order.additionalOngoingCosts!)} />
+          <Row label="Ongoing costs" value={formatCurrency(order.additionalOngoingCosts!)} />
         )}
         {safeNum(order.additionalOutcosts) > 0 && (
-          <Row label="Outcosts" value={fmt(order.additionalOutcosts!)} />
+          <Row label="Outcosts" value={formatCurrency(order.additionalOutcosts!)} />
         )}
       </SectionCard>
 

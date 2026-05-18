@@ -1,54 +1,25 @@
-import { Resend } from 'resend'
-import { db } from '@/lib/db'
+import { Resend } from 'resend';
+import { db } from '@/lib/db';
+import { calculateOrderTotal } from '@/lib/orders';
+import { formatCurrency, formatDate } from '@/lib/format';
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(value)
-}
-
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(date)
-}
-
-function calculateTotalValue(order: {
-  hourlyRate: number
-  additionalOngoingCosts: number | null
-  additionalOutcosts: number | null
-  hoursEntries: Array<{
-    hours: number | null
-    setupHours: number | null
-    monthlyHours: number | null
-    months: number | null
-  }>
-}): number {
-  const hoursValue = order.hoursEntries.reduce((sum, entry) => {
-    const oneOff = (entry.hours ?? 0) + (entry.setupHours ?? 0)
-    const recurring = (entry.monthlyHours ?? 0) * (entry.months ?? 0)
-    return sum + (oneOff + recurring) * order.hourlyRate
-  }, 0)
-  return hoursValue + (order.additionalOngoingCosts ?? 0) + (order.additionalOutcosts ?? 0)
-}
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 function buildHtml(params: {
-  orderId: string
-  companyName: string
-  projectName: string | null
-  salesperson: string
-  requirementType: string
-  totalValue: number
-  submittedAt: Date
-  isAmended: boolean
+  orderId: string;
+  companyName: string;
+  projectName: string | null;
+  salesperson: string;
+  requirementType: string;
+  totalValue: number;
+  submittedAt: Date;
+  isAmended: boolean;
   invoiceSchedule: Array<{
-    percentage: number
-    date: Date | null
-    monthOffset: number | null
-  }>
-  appUrl: string
+    percentage: number;
+    date: Date | null;
+    monthOffset: number | null;
+  }>;
+  appUrl: string;
 }): string {
   const {
     orderId,
@@ -61,9 +32,9 @@ function buildHtml(params: {
     isAmended,
     invoiceSchedule,
     appUrl,
-  } = params
+  } = params;
 
-  const orderUrl = `${appUrl}/orders/${orderId}`
+  const orderUrl = `${appUrl}/orders/${orderId}`;
 
   const scheduleRows = invoiceSchedule
     .map((item) => {
@@ -72,18 +43,18 @@ function buildHtml(params: {
           ? formatDate(item.date)
           : item.monthOffset != null
             ? `Month ${item.monthOffset}`
-            : '—'
-      const amount = formatCurrency((totalValue * item.percentage) / 100)
+            : '—';
+      const amount = formatCurrency((totalValue * item.percentage) / 100);
       return `
         <tr>
           <td style="padding:6px 10px;border:1px solid #ddd;">${when}</td>
           <td style="padding:6px 10px;border:1px solid #ddd;">${item.percentage}%</td>
           <td style="padding:6px 10px;border:1px solid #ddd;">${amount}</td>
-        </tr>`
+        </tr>`;
     })
-    .join('')
+    .join('');
 
-  const heading = isAmended ? 'Amended Sales Order' : 'New Sales Order'
+  const heading = isAmended ? 'Amended Sales Order' : 'New Sales Order';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -120,11 +91,15 @@ function buildHtml(params: {
         <th style="text-align:left;padding:6px 10px;background:#f5f5f5;">Total Value</th>
         <td style="padding:6px 10px;font-weight:bold;">${formatCurrency(totalValue)}</td>
       </tr>
-      ${!isAmended ? `
+      ${
+        !isAmended
+          ? `
       <tr>
         <th style="text-align:left;padding:6px 10px;background:#f5f5f5;">Submitted</th>
         <td style="padding:6px 10px;">${formatDate(submittedAt)}</td>
-      </tr>` : ''}
+      </tr>`
+          : ''
+      }
     </tbody>
   </table>
 
@@ -150,28 +125,31 @@ function buildHtml(params: {
     </a>
   </p>
 </body>
-</html>`
+</html>`;
 }
 
-export async function sendFinanceEmail(orderId: string, isAmended: boolean): Promise<void> {
+export async function sendFinanceEmail(
+  orderId: string,
+  isAmended: boolean,
+): Promise<void> {
   const order = await db.order.findUniqueOrThrow({
     where: { id: orderId },
     include: {
       hoursEntries: true,
       invoiceSchedule: true,
     },
-  })
+  });
 
-  const totalValue = calculateTotalValue(order)
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
+  const totalValue = calculateOrderTotal(order);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
 
-  const clientLabel = `${order.companyName} / ${order.projectName ?? order.companyName}`
+  const clientLabel = `${order.companyName} / ${order.projectName ?? order.companyName}`;
   const subject = isAmended
     ? `Amended Sales Order — ${clientLabel}`
-    : `New Sales Order — ${clientLabel}`
+    : `New Sales Order — ${clientLabel}`;
 
-  const to = process.env.FINANCE_EMAIL_TO ?? 'finance@ascensor.co.uk'
-  const cc = process.env.FINANCE_EMAIL_CC
+  const to = process.env.FINANCE_EMAIL_TO ?? 'luke.volpe@gmail.com';
+  const cc = process.env.FINANCE_EMAIL_CC;
 
   const html = buildHtml({
     orderId,
@@ -184,17 +162,17 @@ export async function sendFinanceEmail(orderId: string, isAmended: boolean): Pro
     isAmended,
     invoiceSchedule: order.invoiceSchedule,
     appUrl,
-  })
+  });
 
   const { error } = await resend.emails.send({
-    from: 'Ascensor Sales <noreply@ascensor.co.uk>',
+    from: 'Ascensor Sales <onboarding@resend.dev>',
     to,
     ...(cc ? { cc } : {}),
     subject,
     html,
-  })
+  });
 
   if (error) {
-    throw new Error(`Failed to send finance email: ${error.message}`)
+    throw new Error(`Failed to send finance email: ${error.message}`);
   }
 }

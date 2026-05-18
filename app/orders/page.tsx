@@ -4,18 +4,22 @@ import { listOrders } from "@/lib/orders"
 import { Button } from "@/components/ui/button"
 import { OrdersSearch } from "@/components/orders-search"
 import { OrdersTable } from "@/components/orders-table"
+import { SuccessBanner } from "@/components/success-banner"
 
 export default async function OrdersPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-  const { q } = await searchParams
+  const { q, success } = await searchParams
   const query = typeof q === "string" ? q : undefined
   const orders = await listOrders(query)
 
   return (
     <div className="p-6 space-y-6">
+      {success === "1" && (
+        <SuccessBanner message="Order saved and finance notified." />
+      )}
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-xl font-semibold">Orders</h1>
         <Button asChild>

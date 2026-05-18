@@ -1,9 +1,8 @@
 export const SALESPEOPLE = [
-  "Alice Johnson",
-  "Ben Carter",
-  "Chris Davies",
-  "Diana Patel",
-  "Ed Williams",
-] as const
+  'Andrew Firth',
+  'Olivia Johnson',
+  'Tiff Hurst',
+  'Luke Volpe',
+] as const;
 
-export type Salesperson = (typeof SALESPEOPLE)[number]
+export type Salesperson = (typeof SALESPEOPLE)[number];

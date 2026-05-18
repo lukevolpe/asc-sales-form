@@ -183,6 +183,9 @@ export default async function OrderPage({
       {success === "1" && (
         <SuccessBanner message="Order saved and finance notified." />
       )}
+      {success === "amended" && (
+        <SuccessBanner message="Order updated and finance notified." />
+      )}
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">

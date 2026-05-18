@@ -707,6 +707,8 @@ function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
   )
 }
 
+// ─── Step 5: Hours ───────────────────────────────────────────────────────────
+
 function HoursStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
   const requirementType = form.watch("requirementType")
 
@@ -728,6 +730,246 @@ function HoursStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
         </p>
       )
   }
+}
+
+// ─── Step 6: Rate, Invoicing Schedule & Additional Costs ─────────────────────
+
+function RateStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
+  const {
+    register,
+    control,
+    watch,
+    setValue,
+    formState: { errors },
+  } = form
+  const { fields, append, remove } = useFieldArray({ control, name: "invoiceSchedule" })
+  const [rowModes, setRowModes] = React.useState<Record<string, "month" | "date">>({})
+
+  const schedule = watch("invoiceSchedule")
+  const total = schedule.reduce((sum, item) => sum + (item.percentage || 0), 0)
+  const totalRounded = Math.round(total)
+
+  const getMode = (fieldId: string): "month" | "date" => rowModes[fieldId] ?? "month"
+
+  const setMode = (fieldId: string, mode: "month" | "date", index: number) => {
+    if (mode === "month") {
+      setValue(`invoiceSchedule.${index}.date`, undefined)
+    } else {
+      setValue(`invoiceSchedule.${index}.monthOffset`, undefined)
+    }
+    setRowModes((prev) => ({ ...prev, [fieldId]: mode }))
+  }
+
+  const addMilestone = () => {
+    append({ percentage: 0 })
+  }
+
+  const removeRow = (index: number, fieldId: string) => {
+    remove(index)
+    setRowModes((prev) => {
+      const next = { ...prev }
+      delete next[fieldId]
+      return next
+    })
+  }
+
+  const scheduleRootError =
+    errors.invoiceSchedule && !Array.isArray(errors.invoiceSchedule)
+      ? (errors.invoiceSchedule as { message?: string }).message
+      : (errors.invoiceSchedule as { root?: { message?: string } } | undefined)?.root?.message
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Field label="Hourly Rate (£/hr)" required error={errors.hourlyRate?.message}>
+        <div className="relative flex items-center">
+          <span className="pointer-events-none absolute left-3 text-sm text-muted-foreground select-none">
+            £
+          </span>
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            {...register("hourlyRate", { valueAsNumber: true })}
+            className="pl-7"
+            aria-invalid={!!errors.hourlyRate}
+          />
+        </div>
+      </Field>
+
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <Label>Invoicing Schedule</Label>
+          <span
+            className={cn(
+              "text-xs font-medium tabular-nums",
+              totalRounded === 100 ? "text-green-600" : "text-destructive"
+            )}
+          >
+            {totalRounded}% / 100%
+          </span>
+        </div>
+
+        {scheduleRootError && (
+          <p className="text-xs text-destructive">{scheduleRootError}</p>
+        )}
+
+        {fields.map((field, index) => {
+          const mode = getMode(field.id)
+          const rowErrors = Array.isArray(errors.invoiceSchedule)
+            ? errors.invoiceSchedule[index]
+            : undefined
+          return (
+            <div
+              key={field.id}
+              className="flex flex-wrap items-end gap-3 rounded-lg border border-border p-3"
+            >
+              <div className="flex items-center gap-4 self-center pt-1">
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <input
+                    type="radio"
+                    className="accent-brand"
+                    checked={mode === "month"}
+                    onChange={() => setMode(field.id, "month", index)}
+                  />
+                  Month #
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <input
+                    type="radio"
+                    className="accent-brand"
+                    checked={mode === "date"}
+                    onChange={() => setMode(field.id, "date", index)}
+                  />
+                  Exact date
+                </label>
+              </div>
+
+              {mode === "month" ? (
+                <Field label="Month no." error={rowErrors?.monthOffset?.message}>
+                  <Input
+                    type="number"
+                    min="1"
+                    {...register(`invoiceSchedule.${index}.monthOffset`, {
+                      valueAsNumber: true,
+                    })}
+                    className="w-24"
+                    placeholder="e.g. 3"
+                  />
+                </Field>
+              ) : (
+                <Field label="Date" error={rowErrors?.date?.message}>
+                  <Input
+                    type="date"
+                    {...register(`invoiceSchedule.${index}.date`)}
+                    className="w-40"
+                  />
+                </Field>
+              )}
+
+              <Field label="%" required error={rowErrors?.percentage?.message}>
+                <div className="relative flex items-center">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    {...register(`invoiceSchedule.${index}.percentage`, {
+                      valueAsNumber: true,
+                    })}
+                    className="w-24 pr-6"
+                    placeholder="25"
+                  />
+                  <span className="pointer-events-none absolute right-2 text-sm text-muted-foreground select-none">
+                    %
+                  </span>
+                </div>
+              </Field>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="self-end"
+                onClick={() => removeRow(index, field.id)}
+                aria-label="Remove milestone"
+              >
+                ✕
+              </Button>
+            </div>
+          )
+        })}
+
+        <Button type="button" variant="outline" onClick={addMilestone}>
+          Add Milestone
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field
+          label="Additional Ongoing Costs (£)"
+          error={errors.additionalOngoingCosts?.message}
+        >
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            {...register("additionalOngoingCosts", { valueAsNumber: true })}
+            placeholder="0"
+          />
+        </Field>
+        <Field label="Additional Outcosts (£)" error={errors.additionalOutcosts?.message}>
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            {...register("additionalOutcosts", { valueAsNumber: true })}
+            placeholder="0"
+          />
+        </Field>
+      </div>
+    </div>
+  )
+}
+
+// ─── Step 7: Project Details ──────────────────────────────────────────────────
+
+function ProjectDetailsStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
+  const {
+    register,
+    formState: { errors },
+  } = form
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Field label="Project name / summary" error={errors.projectName?.message}>
+        <Input
+          {...register("projectName")}
+          placeholder="Website redesign"
+        />
+      </Field>
+      <Field label="Description of requirements" error={errors.projectDescription?.message}>
+        <textarea
+          {...register("projectDescription")}
+          rows={4}
+          placeholder="Describe the project requirements…"
+          className={cn(
+            "flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none resize-none",
+            "placeholder:text-muted-foreground",
+            "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+            "disabled:cursor-not-allowed disabled:opacity-50"
+          )}
+        />
+      </Field>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Estimated start date" error={errors.estimatedStartDate?.message}>
+          <Input type="date" {...register("estimatedStartDate")} />
+        </Field>
+        <Field label="Estimated end date" error={errors.estimatedEndDate?.message}>
+          <Input type="date" {...register("estimatedEndDate")} />
+        </Field>
+      </div>
+    </div>
+  )
 }
 
 // ─── Placeholder for future steps ────────────────────────────────────────────
@@ -775,6 +1017,15 @@ function stepHasErrors(
       )
     case STEP_HOURS:
       return !!errors.hoursEntries
+    case STEP_RATE: {
+      const scheduleRootError =
+        errors.invoiceSchedule && !Array.isArray(errors.invoiceSchedule)
+          ? true
+          : !!(errors.invoiceSchedule as { root?: unknown } | undefined)?.root
+      return !!(errors.hourlyRate || scheduleRootError)
+    }
+    case STEP_PROJECT:
+      return !!(errors.projectName || errors.estimatedStartDate)
     default:
       return false
   }
@@ -804,6 +1055,8 @@ function getStepFields(
     }
     case STEP_HOURS:
       return []
+    case STEP_RATE:
+      return ["hourlyRate", "invoiceSchedule"]
     default:
       return []
   }
@@ -837,7 +1090,13 @@ export default function NewOrderPage() {
       requirementSubType: "",
       hoursEntries: [],
       hourlyRate: 110,
+      additionalOngoingCosts: undefined,
+      additionalOutcosts: undefined,
       invoiceSchedule: [],
+      projectName: "",
+      projectDescription: "",
+      estimatedStartDate: "",
+      estimatedEndDate: "",
     },
     mode: "onTouched",
   })
@@ -908,6 +1167,10 @@ export default function NewOrderPage() {
         return <SalesInfoStep form={form} />
       case STEP_HOURS:
         return <HoursStep form={form} />
+      case STEP_RATE:
+        return <RateStep form={form} />
+      case STEP_PROJECT:
+        return <ProjectDetailsStep form={form} />
       default:
         return <PlaceholderStep label={currentStepLabel} />
     }

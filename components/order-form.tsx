@@ -884,6 +884,7 @@ function ConfirmStep({
                 <tr className="bg-muted/60 text-left">
                   <th className="px-3 py-2 font-medium">Milestone</th>
                   <th className="px-3 py-2 font-medium text-right">%</th>
+                  <th className="px-3 py-2 font-medium text-right">Cost</th>
                 </tr>
               </thead>
               <tbody>
@@ -897,6 +898,7 @@ function ConfirmStep({
                           : `Milestone ${idx + 1}`}
                     </td>
                     <td className="px-3 py-2 text-right">{item.percentage}%</td>
+                    <td className="px-3 py-2 text-right">{formatCurrency((item.percentage / 100) * total)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1084,9 +1086,15 @@ export function OrderForm({
         return
       }
       onSuccess(result.id)
+    } catch {
+      setSubmitError('Something went wrong. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  function handleInvalid() {
+    setSubmitError('Some required fields are incomplete. Please review the steps above.')
   }
 
   const currentStepLabel =
@@ -1159,7 +1167,7 @@ export function OrderForm({
         </Button>
         <Button
           type="button"
-          onClick={isLastStep ? form.handleSubmit(handleSubmit) : goNext}
+          onClick={isLastStep ? form.handleSubmit(handleSubmit, handleInvalid) : goNext}
           disabled={isSubmitting}
         >
           {submitLabel}

@@ -10,7 +10,7 @@ export default function NewOrderPage() {
     <OrderForm
       defaultValues={NEW_ORDER_DEFAULTS}
       submitAction={createOrder}
-      onSuccess={(id) => router.push(`/orders/${id}?success=1`)}
+      onSuccess={() => router.push(`/orders?success=1`)}
       pageTitle="New Order"
     />
   )

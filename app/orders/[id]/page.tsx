@@ -118,7 +118,7 @@ function HoursTable({ order }: { order: FullOrder }) {
 
 // ─── Invoice Schedule Table ───────────────────────────────────────────────────
 
-function InvoiceScheduleTable({ order }: { order: FullOrder }) {
+function InvoiceScheduleTable({ order, total }: { order: FullOrder; total: number }) {
   const { invoiceSchedule } = order
   if (invoiceSchedule.length === 0) return <p className="text-sm text-muted-foreground">No schedule set.</p>
 
@@ -129,6 +129,7 @@ function InvoiceScheduleTable({ order }: { order: FullOrder }) {
           <tr className="bg-muted/60 text-left">
             <th className="px-3 py-2 font-medium">Milestone</th>
             <th className="px-3 py-2 font-medium text-right">%</th>
+            <th className="px-3 py-2 font-medium text-right">Cost</th>
           </tr>
         </thead>
         <tbody>
@@ -142,6 +143,7 @@ function InvoiceScheduleTable({ order }: { order: FullOrder }) {
                     : `Milestone ${idx + 1}`}
               </td>
               <td className="px-3 py-2 text-right">{item.percentage}%</td>
+              <td className="px-3 py-2 text-right">{formatCurrency((item.percentage / 100) * total)}</td>
             </tr>
           ))}
         </tbody>
@@ -272,7 +274,7 @@ export default async function OrderPage({
 
       {/* Invoicing Schedule */}
       <SectionCard title="Invoicing Schedule">
-        <InvoiceScheduleTable order={order} />
+        <InvoiceScheduleTable order={order} total={total} />
       </SectionCard>
 
       {/* Project Details */}

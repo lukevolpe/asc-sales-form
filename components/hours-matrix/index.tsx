@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { AIR_WEBSITE_PACKAGES, SINGLE_COLUMN_ROLES } from '@/lib/constants/airWebsitePackages'
 import { formatCurrency } from '@/lib/format'
 import type { OrderFormValues } from '@/lib/schemas/order'
+import { cn } from '@/lib/utils'
 
 function safeNum(n: number | undefined | null): number {
   return Number.isFinite(n) ? (n ?? 0) : 0
@@ -25,9 +26,63 @@ function MatrixTotalRow({ label, value }: { label: string; value: string }) {
 
 function SingleColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) {
   const { fields } = useFieldArray({ control: form.control, name: 'hoursEntries' })
+  const [manualOverrides, setManualOverrides] = React.useState<Set<string>>(new Set())
+  const manualOverridesRef = React.useRef(manualOverrides)
   const hourlyRate = safeNum(form.watch('hourlyRate'))
   const entries = form.watch('hoursEntries')
   const total = entries.reduce((sum, e) => sum + safeNum(e.hours) * hourlyRate, 0)
+
+  React.useEffect(() => {
+    manualOverridesRef.current = manualOverrides
+  }, [manualOverrides])
+
+  React.useEffect(() => {
+    const subscription = form.watch((values) => {
+      const rawEntries = (values.hoursEntries ?? []) as Array<{
+        roleName?: string
+        hours?: number | null
+      }>
+      const { testingIdx, pmIdx, derivedTesting, derivedPm } = computeDerivedHours(
+        rawEntries,
+        manualOverridesRef.current
+      )
+
+      if (!manualOverridesRef.current.has(TESTING_ROLE) && testingIdx >= 0) {
+        const current = safeNum(rawEntries[testingIdx]?.hours)
+        if (current !== derivedTesting) {
+          form.setValue(`hoursEntries.${testingIdx}.hours`, derivedTesting, { shouldDirty: false })
+        }
+      }
+
+      if (!manualOverridesRef.current.has(PM_ROLE) && pmIdx >= 0) {
+        const current = safeNum(rawEntries[pmIdx]?.hours)
+        if (current !== derivedPm) {
+          form.setValue(`hoursEntries.${pmIdx}.hours`, derivedPm, { shouldDirty: false })
+        }
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [form])
+
+  function resetDerived(roleName: string) {
+    setManualOverrides((prev) => {
+      const next = new Set(prev)
+      next.delete(roleName)
+      manualOverridesRef.current = next
+      return next
+    })
+    const currentEntries = form.getValues('hoursEntries')
+    const { testingIdx, pmIdx, derivedTesting, derivedPm } = computeDerivedHours(
+      currentEntries,
+      manualOverridesRef.current
+    )
+    if (roleName === TESTING_ROLE && testingIdx >= 0) {
+      form.setValue(`hoursEntries.${testingIdx}.hours`, derivedTesting, { shouldDirty: false })
+    }
+    if (roleName === PM_ROLE && pmIdx >= 0) {
+      form.setValue(`hoursEntries.${pmIdx}.hours`, derivedPm, { shouldDirty: false })
+    }
+  }
 
   return (
     <div className="overflow-x-auto">
@@ -41,17 +96,63 @@ function SingleColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) 
         </thead>
         <tbody>
           {fields.map((field, idx) => {
+            const roleName = field.roleName
+            const isDerived = roleName === TESTING_ROLE || roleName === PM_ROLE
+            const isOverridden = manualOverrides.has(roleName)
             const hrs = safeNum(entries[idx]?.hours)
+
+            const registerProps = form.register(`hoursEntries.${idx}.hours`, {
+              valueAsNumber: true,
+            })
+
             return (
-              <tr key={field.id} className="border-t border-border">
-                <td className="px-3 py-2">{field.roleName}</td>
+              <tr
+                key={field.id}
+                className={cn(
+                  'border-t border-border',
+                  isDerived && !isOverridden && 'bg-muted/20'
+                )}
+              >
+                <td className="px-3 py-2">{roleName}</td>
                 <td className="px-3 py-2">
-                  <Input
-                    type="number"
-                    min={0}
-                    className="h-8 w-24"
-                    {...form.register(`hoursEntries.${idx}.hours`, { valueAsNumber: true })}
-                  />
+                  {isDerived ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        className={cn('h-8 w-24', !isOverridden && 'bg-muted/50')}
+                        {...registerProps}
+                        onChange={(e) => {
+                          registerProps.onChange(e)
+                          setManualOverrides((prev) => {
+                            const next = new Set([...prev, roleName])
+                            manualOverridesRef.current = next
+                            return next
+                          })
+                        }}
+                      />
+                      {!isOverridden ? (
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          auto
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => resetDerived(roleName)}
+                          className="text-xs text-muted-foreground hover:text-foreground whitespace-nowrap underline underline-offset-2"
+                        >
+                          ↩ auto
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <Input
+                      type="number"
+                      min={0}
+                      className="h-8 w-24"
+                      {...registerProps}
+                    />
+                  )}
                 </td>
                 <td className="px-3 py-2 text-right text-muted-foreground">
                   {formatCurrency(hrs * hourlyRate)}
@@ -189,21 +290,112 @@ function BauForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
   )
 }
 
+const TESTING_ROLE = 'Testing'
+const PM_ROLE = 'Project Management'
+
+function computeDerivedHours(
+  entries: Array<{ roleName?: string; hours?: number | null }>,
+  manualOverrides: Set<string>
+): { testingIdx: number; pmIdx: number; derivedTesting: number; derivedPm: number } {
+  const testingIdx = entries.findIndex((e) => e.roleName === TESTING_ROLE)
+  const pmIdx = entries.findIndex((e) => e.roleName === PM_ROLE)
+
+  const frontend = safeNum(entries.find((e) => e.roleName === 'Frontend')?.hours)
+  const backend = safeNum(entries.find((e) => e.roleName === 'Backend')?.hours)
+  const derivedTesting = Math.round((frontend + backend) * 0.25)
+
+  const effectiveTesting = manualOverrides.has(TESTING_ROLE)
+    ? safeNum(entries[testingIdx]?.hours)
+    : derivedTesting
+
+  const pmBase = entries.reduce((sum, e, idx) => {
+    if (idx === pmIdx) return sum
+    if (e.roleName === TESTING_ROLE) return sum + effectiveTesting
+    return sum + safeNum(e.hours)
+  }, 0)
+  const derivedPm = Math.round(pmBase * 0.2)
+
+  return { testingIdx, pmIdx, derivedTesting, derivedPm }
+}
+
 function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
   const { fields } = useFieldArray({ control: form.control, name: 'hoursEntries' })
   const [selectedPackage, setSelectedPackage] = React.useState('')
+  const [manualOverrides, setManualOverrides] = React.useState<Set<string>>(new Set())
+  const manualOverridesRef = React.useRef(manualOverrides)
+
   const hourlyRate = safeNum(form.watch('hourlyRate'))
   const entries = form.watch('hoursEntries')
   const total = entries.reduce((sum, e) => sum + safeNum(e.hours) * hourlyRate, 0)
 
+  // Keep ref in sync so the subscription closure always sees the latest overrides
+  React.useEffect(() => {
+    manualOverridesRef.current = manualOverrides
+  }, [manualOverrides])
+
+  // Subscription-based derived calculation — fires on every form value change,
+  // bypassing render-cycle timing issues with uncontrolled form.register inputs.
+  React.useEffect(() => {
+    const subscription = form.watch((values) => {
+      const rawEntries = (values.hoursEntries ?? []) as Array<{
+        roleName?: string
+        hours?: number | null
+      }>
+      const { testingIdx, pmIdx, derivedTesting, derivedPm } = computeDerivedHours(
+        rawEntries,
+        manualOverridesRef.current
+      )
+
+      if (!manualOverridesRef.current.has(TESTING_ROLE) && testingIdx >= 0) {
+        const current = safeNum(rawEntries[testingIdx]?.hours)
+        if (current !== derivedTesting) {
+          form.setValue(`hoursEntries.${testingIdx}.hours`, derivedTesting, {
+            shouldDirty: false,
+          })
+        }
+      }
+
+      if (!manualOverridesRef.current.has(PM_ROLE) && pmIdx >= 0) {
+        const current = safeNum(rawEntries[pmIdx]?.hours)
+        if (current !== derivedPm) {
+          form.setValue(`hoursEntries.${pmIdx}.hours`, derivedPm, { shouldDirty: false })
+        }
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [form])
+
   function applyPackage(packageName: string) {
     setSelectedPackage(packageName)
+    setManualOverrides(new Set())
+    manualOverridesRef.current = new Set()
     const pkg = AIR_WEBSITE_PACKAGES[packageName]
     if (pkg) {
       form.setValue(
         'hoursEntries',
         SINGLE_COLUMN_ROLES.map((role) => ({ roleName: role, hours: pkg[role] }))
       )
+    }
+  }
+
+  function resetDerived(roleName: string) {
+    setManualOverrides((prev) => {
+      const next = new Set(prev)
+      next.delete(roleName)
+      manualOverridesRef.current = next
+      return next
+    })
+    // Trigger subscription to recompute now that override is cleared
+    const entries = form.getValues('hoursEntries')
+    const { testingIdx, pmIdx, derivedTesting, derivedPm } = computeDerivedHours(
+      entries,
+      manualOverridesRef.current
+    )
+    if (roleName === TESTING_ROLE && testingIdx >= 0) {
+      form.setValue(`hoursEntries.${testingIdx}.hours`, derivedTesting, { shouldDirty: false })
+    }
+    if (roleName === PM_ROLE && pmIdx >= 0) {
+      form.setValue(`hoursEntries.${pmIdx}.hours`, derivedPm, { shouldDirty: false })
     }
   }
 
@@ -236,17 +428,65 @@ function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
           </thead>
           <tbody>
             {fields.map((field, idx) => {
+              const roleName = field.roleName
+              const isDerived = roleName === TESTING_ROLE || roleName === PM_ROLE
+              const isOverridden = manualOverrides.has(roleName)
               const hrs = safeNum(entries[idx]?.hours)
+
+              // For derived rows: spread register props but intercept onChange to track overrides.
+              // form.register is still used so the value is always included in form.getValues().
+              const registerProps = form.register(`hoursEntries.${idx}.hours`, {
+                valueAsNumber: true,
+              })
+
               return (
-                <tr key={field.id} className="border-t border-border">
-                  <td className="px-3 py-2">{field.roleName}</td>
+                <tr
+                  key={field.id}
+                  className={cn(
+                    'border-t border-border',
+                    isDerived && !isOverridden && 'bg-muted/20'
+                  )}
+                >
+                  <td className="px-3 py-2">{roleName}</td>
                   <td className="px-3 py-2">
-                    <Input
-                      type="number"
-                      min={0}
-                      className="h-8 w-24"
-                      {...form.register(`hoursEntries.${idx}.hours`, { valueAsNumber: true })}
-                    />
+                    {isDerived ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          className={cn('h-8 w-24', !isOverridden && 'bg-muted/50')}
+                          {...registerProps}
+                          onChange={(e) => {
+                            registerProps.onChange(e)
+                            setManualOverrides((prev) => {
+                              const next = new Set([...prev, roleName])
+                              manualOverridesRef.current = next
+                              return next
+                            })
+                          }}
+                        />
+                        {!isOverridden ? (
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            auto
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => resetDerived(roleName)}
+                            className="text-xs text-muted-foreground hover:text-foreground whitespace-nowrap underline underline-offset-2"
+                          >
+                            ↩ auto
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <Input
+                        type="number"
+                        min={0}
+                        className="h-8 w-24"
+                        {...registerProps}
+                      />
+                    )}
                   </td>
                   <td className="px-3 py-2 text-right text-muted-foreground">
                     {formatCurrency(hrs * hourlyRate)}

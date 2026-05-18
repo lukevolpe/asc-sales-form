@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import { useForm, useFieldArray } from "react-hook-form"
 import type { UseFormReturn } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -16,6 +17,7 @@ import {
   TWO_COLUMN_CHANNELS,
   AIR_WEBSITE_PACKAGES,
 } from "@/lib/constants/airWebsitePackages"
+import { createOrder } from "@/app/actions/orders"
 
 // ─── Step IDs ───────────────────────────────────────────────────────────────
 
@@ -1316,7 +1318,10 @@ function getStepFields(
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function NewOrderPage() {
+  const router = useRouter()
   const [currentStepId, setCurrentStepId] = React.useState<string>(STEP_CUSTOMER)
+  const [submitError, setSubmitError] = React.useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
@@ -1403,8 +1408,19 @@ export default function NewOrderPage() {
 
   const isLastStep = currentStepIndex === visibleSteps.length - 1
 
-  async function handleSubmitOrder() {
-    // TODO issue #10: call createOrder server action
+  async function handleSubmitOrder(values: OrderFormValues) {
+    setSubmitError(null)
+    setIsSubmitting(true)
+    try {
+      const result = await createOrder(values)
+      if ('error' in result) {
+        setSubmitError(result.error)
+        return
+      }
+      router.push(`/orders/${result.id}?success=1`)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const currentStepLabel =
@@ -1443,20 +1459,27 @@ export default function NewOrderPage() {
 
       <div className="mb-8">{renderStep()}</div>
 
+      {submitError && (
+        <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {submitError}
+        </p>
+      )}
+
       <div className="flex items-center justify-between gap-4">
         <Button
           type="button"
           variant="outline"
           onClick={goBack}
-          disabled={currentStepIndex === 0}
+          disabled={currentStepIndex === 0 || isSubmitting}
         >
           Back
         </Button>
         <Button
           type="button"
           onClick={isLastStep ? form.handleSubmit(handleSubmitOrder) : goNext}
+          disabled={isSubmitting}
         >
-          {isLastStep ? "Submit Order" : "Next"}
+          {isLastStep ? (isSubmitting ? "Submitting…" : "Submit Order") : "Next"}
         </Button>
       </div>
     </div>

@@ -1,4 +1,20 @@
 import { db } from '@/lib/db'
+import type { Order, HoursEntry, InvoiceScheduleItem } from '@prisma/client'
+
+export type FullOrder = Order & {
+  hoursEntries: HoursEntry[]
+  invoiceSchedule: InvoiceScheduleItem[]
+}
+
+export async function getOrder(id: string): Promise<FullOrder | null> {
+  return db.order.findUnique({
+    where: { id },
+    include: {
+      hoursEntries: true,
+      invoiceSchedule: true,
+    },
+  })
+}
 
 export type OrderListItem = {
   id: string

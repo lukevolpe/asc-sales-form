@@ -51,6 +51,22 @@ function safeNum(n: number | undefined | null): number {
   return Number.isFinite(n) ? (n ?? 0) : 0
 }
 
+function calcOrderTotal(values: OrderFormValues): number {
+  const rate = safeNum(values.hourlyRate)
+  const hoursTotal = values.hoursEntries.reduce((sum, e) => {
+    const h =
+      safeNum(e.hours) +
+      safeNum(e.setupHours) +
+      safeNum(e.monthlyHours) * (safeNum(e.months) || 1)
+    return sum + h * rate
+  }, 0)
+  return (
+    hoursTotal +
+    safeNum(values.additionalOngoingCosts) +
+    safeNum(values.additionalOutcosts)
+  )
+}
+
 function getDefaultHoursEntries(
   requirementType: string
 ): OrderFormValues["hoursEntries"] {
@@ -982,6 +998,241 @@ function PlaceholderStep({ label }: { label: string }) {
   )
 }
 
+// ─── Step 8: Confirm ──────────────────────────────────────────────────────────
+
+function SummaryCard({
+  title,
+  onEdit,
+  children,
+}: {
+  title: string
+  onEdit: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-lg border border-border p-4">
+      <div className="flex items-start justify-between mb-3">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="text-xs text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded"
+        >
+          Edit
+        </button>
+      </div>
+      <div className="flex flex-col gap-2">{children}</div>
+    </div>
+  )
+}
+
+function SummaryRow({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null
+  return (
+    <div className="flex gap-2 text-sm">
+      <span className="text-muted-foreground w-36 shrink-0">{label}</span>
+      <span>{value}</span>
+    </div>
+  )
+}
+
+function ConfirmHoursTable({ form }: { form: UseFormReturn<OrderFormValues> }) {
+  const requirementType = form.watch("requirementType")
+  const entries = form.watch("hoursEntries")
+  const rate = safeNum(form.watch("hourlyRate"))
+
+  if (requirementType === "BAU Retainer") {
+    const studio = entries[0]
+    const marketing = entries[1]
+    const months = safeNum(studio?.months) || 1
+    const total =
+      (safeNum(studio?.monthlyHours) + safeNum(marketing?.monthlyHours)) * months * rate
+    return (
+      <div className="flex flex-col gap-2">
+        <SummaryRow label="Studio hrs/month" value={String(safeNum(studio?.monthlyHours))} />
+        <SummaryRow
+          label="Marketing hrs/month"
+          value={String(safeNum(marketing?.monthlyHours))}
+        />
+        <SummaryRow label="Months" value={String(months)} />
+        <SummaryRow label="Hours total value" value={formatCurrency(total)} />
+      </div>
+    )
+  }
+
+  const isTwoCol =
+    requirementType === "Marketing Project" || requirementType === "B2B/B2C Lead Gen"
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm border border-border rounded-lg overflow-hidden">
+        <thead>
+          <tr className="bg-muted/60 text-left">
+            <th className="px-3 py-2 font-medium w-2/5">{isTwoCol ? "Channel" : "Role"}</th>
+            {isTwoCol ? (
+              <>
+                <th className="px-3 py-2 font-medium">Setup Hrs</th>
+                <th className="px-3 py-2 font-medium">Monthly Hrs</th>
+              </>
+            ) : (
+              <th className="px-3 py-2 font-medium">Hours</th>
+            )}
+            <th className="px-3 py-2 font-medium text-right">Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map((entry, idx) => {
+            const cost = isTwoCol
+              ? (safeNum(entry.setupHours) + safeNum(entry.monthlyHours)) * rate
+              : safeNum(entry.hours) * rate
+            return (
+              <tr key={entry.roleName ?? idx} className="border-t border-border">
+                <td className="px-3 py-2">{entry.roleName}</td>
+                {isTwoCol ? (
+                  <>
+                    <td className="px-3 py-2">{safeNum(entry.setupHours)}</td>
+                    <td className="px-3 py-2">{safeNum(entry.monthlyHours)}</td>
+                  </>
+                ) : (
+                  <td className="px-3 py-2">{safeNum(entry.hours)}</td>
+                )}
+                <td className="px-3 py-2 text-right text-muted-foreground">
+                  {formatCurrency(cost)}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function ConfirmStep({
+  form,
+  onGoToStep,
+  isEditMode = false,
+  amendingOrderRef,
+}: {
+  form: UseFormReturn<OrderFormValues>
+  onGoToStep: (stepId: string) => void
+  isEditMode?: boolean
+  amendingOrderRef?: string
+}) {
+  const values = form.watch()
+  const total = calcOrderTotal(values)
+  const schedule = values.invoiceSchedule
+
+  return (
+    <div className="flex flex-col gap-6">
+      {isEditMode && amendingOrderRef && (
+        <p className="text-sm font-medium text-brand">
+          Amending Order #{amendingOrderRef}
+        </p>
+      )}
+
+      <div className="rounded-xl bg-brand/10 border border-brand/20 p-6 text-center">
+        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+          Total Order Value
+        </p>
+        <p className="text-3xl font-bold text-brand">{formatCurrency(total)}</p>
+      </div>
+
+      <SummaryCard title="Customer" onEdit={() => onGoToStep(STEP_CUSTOMER)}>
+        <SummaryRow label="Company" value={values.companyName} />
+        <SummaryRow label="Contact" value={values.contactName} />
+        <SummaryRow label="Email" value={values.email} />
+        <SummaryRow label="Phone" value={values.phone} />
+        <SummaryRow
+          label="Customer type"
+          value={values.isNewCustomer ? "New customer" : "Existing customer"}
+        />
+        {values.isNewCustomer && (
+          <>
+            <SummaryRow label="Address line 1" value={values.billingLine1} />
+            <SummaryRow label="Address line 2" value={values.billingLine2} />
+            <SummaryRow label="Town / city" value={values.billingTown} />
+            <SummaryRow label="County" value={values.billingCounty} />
+            <SummaryRow label="Postcode" value={values.billingPostcode} />
+            <SummaryRow label="Country" value={values.billingCountry} />
+          </>
+        )}
+      </SummaryCard>
+
+      <SummaryCard title="Account Contact" onEdit={() => onGoToStep(STEP_ACCOUNT_CONTACT)}>
+        {values.accountSameAsCustomer ? (
+          <p className="text-sm text-muted-foreground">Same as customer contact</p>
+        ) : (
+          <>
+            <SummaryRow label="Company" value={values.accountCompanyName} />
+            <SummaryRow label="Contact" value={values.accountContactName} />
+            <SummaryRow label="Email" value={values.accountEmail} />
+          </>
+        )}
+      </SummaryCard>
+
+      <SummaryCard title="Sales Info" onEdit={() => onGoToStep(STEP_SALES_INFO)}>
+        <SummaryRow label="Salesperson" value={values.salesperson} />
+        <SummaryRow label="Requirement type" value={values.requirementType} />
+        <SummaryRow label="Sub-type" value={values.requirementSubType} />
+      </SummaryCard>
+
+      <SummaryCard title="Hours" onEdit={() => onGoToStep(STEP_HOURS)}>
+        <ConfirmHoursTable form={form} />
+      </SummaryCard>
+
+      <SummaryCard title="Rate & Invoicing Schedule" onEdit={() => onGoToStep(STEP_RATE)}>
+        <SummaryRow label="Hourly rate" value={`£${values.hourlyRate}/hr`} />
+        {(values.additionalOngoingCosts ?? 0) > 0 && (
+          <SummaryRow
+            label="Ongoing costs"
+            value={formatCurrency(values.additionalOngoingCosts!)}
+          />
+        )}
+        {(values.additionalOutcosts ?? 0) > 0 && (
+          <SummaryRow
+            label="Outcosts"
+            value={formatCurrency(values.additionalOutcosts!)}
+          />
+        )}
+        {schedule.length > 0 && (
+          <div className="overflow-x-auto mt-2">
+            <table className="w-full text-sm border border-border rounded-lg overflow-hidden">
+              <thead>
+                <tr className="bg-muted/60 text-left">
+                  <th className="px-3 py-2 font-medium">Milestone</th>
+                  <th className="px-3 py-2 font-medium text-right">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {schedule.map((item, idx) => (
+                  <tr key={idx} className="border-t border-border">
+                    <td className="px-3 py-2">
+                      {item.date
+                        ? new Date(item.date).toLocaleDateString("en-GB")
+                        : item.monthOffset
+                          ? `Month ${item.monthOffset}`
+                          : `Milestone ${idx + 1}`}
+                    </td>
+                    <td className="px-3 py-2 text-right">{item.percentage}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SummaryCard>
+
+      <SummaryCard title="Project Details" onEdit={() => onGoToStep(STEP_PROJECT)}>
+        <SummaryRow label="Project name" value={values.projectName} />
+        <SummaryRow label="Description" value={values.projectDescription} />
+        <SummaryRow label="Start date" value={values.estimatedStartDate} />
+        <SummaryRow label="End date" value={values.estimatedEndDate} />
+      </SummaryCard>
+    </div>
+  )
+}
+
 // ─── Step error detection ─────────────────────────────────────────────────────
 
 function stepHasErrors(
@@ -1152,6 +1403,10 @@ export default function NewOrderPage() {
 
   const isLastStep = currentStepIndex === visibleSteps.length - 1
 
+  async function handleSubmitOrder() {
+    // TODO issue #10: call createOrder server action
+  }
+
   const currentStepLabel =
     ALL_STEPS.find((s) => s.id === currentStepId)?.label ?? "Step"
 
@@ -1171,6 +1426,8 @@ export default function NewOrderPage() {
         return <RateStep form={form} />
       case STEP_PROJECT:
         return <ProjectDetailsStep form={form} />
+      case STEP_CONFIRM:
+        return <ConfirmStep form={form} onGoToStep={setCurrentStepId} />
       default:
         return <PlaceholderStep label={currentStepLabel} />
     }
@@ -1195,8 +1452,11 @@ export default function NewOrderPage() {
         >
           Back
         </Button>
-        <Button type="button" onClick={isLastStep ? undefined : goNext}>
-          {isLastStep ? "Submit" : "Next"}
+        <Button
+          type="button"
+          onClick={isLastStep ? form.handleSubmit(handleSubmitOrder) : goNext}
+        >
+          {isLastStep ? "Submit Order" : "Next"}
         </Button>
       </div>
     </div>

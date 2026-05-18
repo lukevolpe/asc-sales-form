@@ -165,7 +165,7 @@ export async function sendFinanceEmail(
   });
 
   const { error } = await resend.emails.send({
-    from: 'Ascensor Sales <no-reply@ascensor.com>',
+    from: 'Ascensor Sales <onboarding@resend.dev>',
     to,
     ...(cc ? { cc } : {}),
     subject,

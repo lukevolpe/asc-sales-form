@@ -621,7 +621,9 @@ function RateStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
             type="number"
             min="0"
             step="0.01"
-            {...register("additionalOngoingCosts", { valueAsNumber: true })}
+            {...register("additionalOngoingCosts", {
+              setValueAs: (v) => (v === "" || v === null || v === undefined ? undefined : Number(v)),
+            })}
             placeholder="0"
           />
         </Field>
@@ -630,7 +632,9 @@ function RateStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
             type="number"
             min="0"
             step="0.01"
-            {...register("additionalOutcosts", { valueAsNumber: true })}
+            {...register("additionalOutcosts", {
+              setValueAs: (v) => (v === "" || v === null || v === undefined ? undefined : Number(v)),
+            })}
             placeholder="0"
           />
         </Field>

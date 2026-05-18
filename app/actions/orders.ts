@@ -15,17 +15,19 @@ export async function updateOrder(
   }
 
   try {
-    await db.$transaction(async (tx) => {
-      await tx.order.update({ where: { id }, data: buildOrderUpdateData(parsed.data) })
-    })
-
-    await sendFinanceEmail(id, true)
-
-    return { id }
+    await db.order.update({ where: { id }, data: buildOrderUpdateData(parsed.data) })
   } catch (err) {
     console.error('updateOrder error:', err)
     return { error: 'Something went wrong updating the order. Please try again.' }
   }
+
+  try {
+    await sendFinanceEmail(id, true)
+  } catch (err) {
+    console.error('updateOrder: finance email failed (order was saved):', err)
+  }
+
+  return { id }
 }
 
 export async function createOrder(
@@ -36,16 +38,20 @@ export async function createOrder(
     return { error: 'Invalid form data. Please check your inputs and try again.' }
   }
 
+  let orderId: string
   try {
-    const order = await db.$transaction(async (tx) => {
-      return tx.order.create({ data: buildOrderCreateData(parsed.data) })
-    })
-
-    await sendFinanceEmail(order.id, false)
-
-    return { id: order.id }
+    const order = await db.order.create({ data: buildOrderCreateData(parsed.data) })
+    orderId = order.id
   } catch (err) {
     console.error('createOrder error:', err)
     return { error: 'Something went wrong saving the order. Please try again.' }
   }
+
+  try {
+    await sendFinanceEmail(orderId, false)
+  } catch (err) {
+    console.error('createOrder: finance email failed (order was saved):', err)
+  }
+
+  return { id: orderId }
 }

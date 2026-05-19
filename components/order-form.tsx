@@ -439,7 +439,13 @@ function HoursStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
 
 // ─── Step 6: Rate, Invoicing Schedule & Additional Costs ─────────────────────
 
-function RateStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
+function RateStep({
+  form,
+  attempted,
+}: {
+  form: UseFormReturn<OrderFormValues>
+  attempted: boolean
+}) {
   const {
     register,
     control,
@@ -449,10 +455,19 @@ function RateStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
   } = form
   const { fields, append, remove } = useFieldArray({ control, name: "invoiceSchedule" })
   const [rowModes, setRowModes] = React.useState<Record<string, "month" | "date">>({})
+  const newRowRef = React.useRef<HTMLInputElement | null>(null)
 
   const schedule = watch("invoiceSchedule")
   const total = schedule.reduce((sum, item) => sum + (item.percentage || 0), 0)
   const totalRounded = Math.round(total)
+
+  const prevLengthRef = React.useRef(fields.length)
+  React.useEffect(() => {
+    if (fields.length > prevLengthRef.current) {
+      newRowRef.current?.focus()
+    }
+    prevLengthRef.current = fields.length
+  }, [fields.length])
 
   // Infer mode from pre-populated data when no override exists in rowModes
   const getMode = (fieldId: string, index: number): "month" | "date" => {
@@ -524,7 +539,8 @@ function RateStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
 
         {fields.map((field, index) => {
           const mode = getMode(field.id, index)
-          const rowErrors = Array.isArray(errors.invoiceSchedule)
+          const isLastRow = index === fields.length - 1
+          const rowErrors = attempted && Array.isArray(errors.invoiceSchedule)
             ? errors.invoiceSchedule[index]
             : undefined
           return (
@@ -555,15 +571,25 @@ function RateStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
 
               {mode === "month" ? (
                 <Field label="Month no." error={rowErrors?.monthOffset?.message}>
-                  <Input
-                    type="number"
-                    min="1"
-                    {...register(`invoiceSchedule.${index}.monthOffset`, {
-                      valueAsNumber: true,
-                    })}
-                    className="w-24"
-                    placeholder="e.g. 3"
-                  />
+                  {(() => {
+                    const { ref: rhfRef, ...monthProps } = register(
+                      `invoiceSchedule.${index}.monthOffset`,
+                      { valueAsNumber: true }
+                    )
+                    return (
+                      <Input
+                        type="number"
+                        min="1"
+                        {...monthProps}
+                        ref={(el) => {
+                          rhfRef(el)
+                          if (isLastRow) newRowRef.current = el
+                        }}
+                        className="w-24"
+                        placeholder="e.g. 3"
+                      />
+                    )
+                  })()}
                 </Field>
               ) : (
                 <Field label="Date" error={rowErrors?.date?.message}>
@@ -922,6 +948,7 @@ export function OrderForm({
   const [currentStepId, setCurrentStepId] = React.useState<string>(STEP_CUSTOMER)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [rateStepAttempted, setRateStepAttempted] = React.useState(false)
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
@@ -963,6 +990,7 @@ export function OrderForm({
   })
 
   const goNext = async () => {
+    if (currentStepId === STEP_RATE) setRateStepAttempted(true)
     const fields = getStepFields(currentStepId, form.getValues())
     if (fields.length > 0) {
       const valid = await form.trigger(fields)
@@ -1016,7 +1044,7 @@ export function OrderForm({
       case STEP_HOURS:
         return <HoursStep form={form} />
       case STEP_RATE:
-        return <RateStep form={form} />
+        return <RateStep form={form} attempted={rateStepAttempted} />
       case STEP_PROJECT:
         return <ProjectDetailsStep form={form} />
       case STEP_CONFIRM:

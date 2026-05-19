@@ -690,25 +690,62 @@ function ProjectDetailsStep({ form }: { form: UseFormReturn<OrderFormValues> }) 
 function SummaryCard({
   title,
   onEdit,
+  onSave,
+  onCancel,
+  isEditing = false,
+  isSaving = false,
+  editContent,
   children,
 }: {
   title: string
   onEdit: () => void
+  onSave?: () => Promise<void>
+  onCancel?: () => void
+  isEditing?: boolean
+  isSaving?: boolean
+  editContent?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
     <div className="rounded-lg border border-border p-4">
       <div className="flex items-start justify-between mb-3">
         <h3 className="text-sm font-semibold">{title}</h3>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="text-xs text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded"
-        >
-          Edit
-        </button>
+        {!isEditing && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="text-xs text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded"
+          >
+            Edit
+          </button>
+        )}
       </div>
-      <div className="flex flex-col gap-2">{children}</div>
+      {isEditing ? (
+        <div className="flex flex-col gap-4">
+          {editContent}
+          <div className="flex gap-2 pt-2 border-t border-border">
+            <Button
+              type="button"
+              size="sm"
+              onClick={onSave}
+              disabled={isSaving}
+            >
+              {isSaving ? "Saving…" : "Save changes"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onCancel}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">{children}</div>
+      )}
     </div>
   )
 }
@@ -726,18 +763,40 @@ function SummaryRow({ label, value }: { label: string; value?: string | null }) 
 
 function ConfirmStep({
   form,
-  onGoToStep,
   isEditMode = false,
   amendingOrderRef,
 }: {
   form: UseFormReturn<OrderFormValues>
-  onGoToStep: (stepId: string) => void
   isEditMode?: boolean
   amendingOrderRef?: string
 }) {
   const values = form.watch()
   const total = calculateOrderTotal(values)
   const schedule = values.invoiceSchedule
+  const [editingStep, setEditingStep] = React.useState<string | null>(null)
+  const [saveAttempted, setSaveAttempted] = React.useState<string | null>(null)
+  const [isSaving, setIsSaving] = React.useState(false)
+
+  const startEdit = (stepId: string) => {
+    setSaveAttempted(null)
+    setEditingStep(stepId)
+  }
+  const cancelEdit = () => {
+    setSaveAttempted(null)
+    setEditingStep(null)
+  }
+
+  const saveEdit = async (stepId: string) => {
+    setSaveAttempted(stepId)
+    const fields = (STEP_FIELD_MAP[stepId] ?? []) as (keyof OrderFormValues)[]
+    setIsSaving(true)
+    const valid = await form.trigger(fields)
+    setIsSaving(false)
+    if (valid) {
+      setSaveAttempted(null)
+      setEditingStep(null)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -754,7 +813,15 @@ function ConfirmStep({
         <p className="text-3xl font-bold text-brand">{formatCurrency(total)}</p>
       </div>
 
-      <SummaryCard title="Customer" onEdit={() => onGoToStep(STEP_CUSTOMER)}>
+      <SummaryCard
+        title="Customer"
+        onEdit={() => startEdit(STEP_CUSTOMER)}
+        onSave={() => saveEdit(STEP_CUSTOMER)}
+        onCancel={cancelEdit}
+        isEditing={editingStep === STEP_CUSTOMER}
+        isSaving={isSaving}
+        editContent={<CustomerInfoStep form={form} />}
+      >
         <SummaryRow label="Company" value={values.companyName} />
         <SummaryRow label="Contact" value={values.contactName} />
         <SummaryRow label="Email" value={values.email} />
@@ -775,7 +842,15 @@ function ConfirmStep({
         )}
       </SummaryCard>
 
-      <SummaryCard title="Account Contact" onEdit={() => onGoToStep(STEP_ACCOUNT_CONTACT)}>
+      <SummaryCard
+        title="Account Contact"
+        onEdit={() => startEdit(STEP_ACCOUNT_CONTACT)}
+        onSave={() => saveEdit(STEP_ACCOUNT_CONTACT)}
+        onCancel={cancelEdit}
+        isEditing={editingStep === STEP_ACCOUNT_CONTACT}
+        isSaving={isSaving}
+        editContent={<AccountContactStep form={form} />}
+      >
         {values.accountSameAsCustomer ? (
           <p className="text-sm text-muted-foreground">Same as customer contact</p>
         ) : (
@@ -787,13 +862,29 @@ function ConfirmStep({
         )}
       </SummaryCard>
 
-      <SummaryCard title="Sales Info" onEdit={() => onGoToStep(STEP_SALES_INFO)}>
+      <SummaryCard
+        title="Sales Info"
+        onEdit={() => startEdit(STEP_SALES_INFO)}
+        onSave={() => saveEdit(STEP_SALES_INFO)}
+        onCancel={cancelEdit}
+        isEditing={editingStep === STEP_SALES_INFO}
+        isSaving={isSaving}
+        editContent={<SalesInfoStep form={form} />}
+      >
         <SummaryRow label="Salesperson" value={values.salesperson} />
         <SummaryRow label="Requirement type" value={values.requirementType} />
         <SummaryRow label="Sub-type" value={values.requirementSubType} />
       </SummaryCard>
 
-      <SummaryCard title="Hours" onEdit={() => onGoToStep(STEP_HOURS)}>
+      <SummaryCard
+        title="Hours"
+        onEdit={() => startEdit(STEP_HOURS)}
+        onSave={() => saveEdit(STEP_HOURS)}
+        onCancel={cancelEdit}
+        isEditing={editingStep === STEP_HOURS}
+        isSaving={isSaving}
+        editContent={<HoursStep form={form} />}
+      >
         <HoursDisplay
           requirementType={values.requirementType ?? ''}
           hourlyRate={safeNum(values.hourlyRate)}
@@ -801,7 +892,15 @@ function ConfirmStep({
         />
       </SummaryCard>
 
-      <SummaryCard title="Rate & Invoicing Schedule" onEdit={() => onGoToStep(STEP_RATE)}>
+      <SummaryCard
+        title="Rate & Invoicing Schedule"
+        onEdit={() => startEdit(STEP_RATE)}
+        onSave={() => saveEdit(STEP_RATE)}
+        onCancel={cancelEdit}
+        isEditing={editingStep === STEP_RATE}
+        isSaving={isSaving}
+        editContent={<RateStep form={form} attempted={saveAttempted === STEP_RATE} />}
+      >
         <SummaryRow label="Hourly rate" value={`£${values.hourlyRate}/hr`} />
         {(values.additionalOngoingCosts ?? 0) > 0 && (
           <SummaryRow
@@ -845,7 +944,15 @@ function ConfirmStep({
         )}
       </SummaryCard>
 
-      <SummaryCard title="Project Details" onEdit={() => onGoToStep(STEP_PROJECT)}>
+      <SummaryCard
+        title="Project Details"
+        onEdit={() => startEdit(STEP_PROJECT)}
+        onSave={() => saveEdit(STEP_PROJECT)}
+        onCancel={cancelEdit}
+        isEditing={editingStep === STEP_PROJECT}
+        isSaving={isSaving}
+        editContent={<ProjectDetailsStep form={form} />}
+      >
         <SummaryRow label="Project name" value={values.projectName} />
         <SummaryRow label="Description" value={values.projectDescription} />
         <SummaryRow label="Start date" value={values.estimatedStartDate} />
@@ -1033,7 +1140,6 @@ export function OrderForm({
         return (
           <ConfirmStep
             form={form}
-            onGoToStep={setCurrentStepId}
             isEditMode={isEditMode}
             amendingOrderRef={amendingOrderRef}
           />

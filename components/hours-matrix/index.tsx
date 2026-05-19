@@ -27,15 +27,11 @@ function MatrixTotalRow({ label, value }: { label: string; value: string }) {
 
 function SingleColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) {
   const { fields } = useFieldArray({ control: form.control, name: 'hoursEntries' })
-  const [manualOverrides, setManualOverrides] = React.useState<Set<string>>(new Set())
-  const manualOverridesRef = React.useRef(manualOverrides)
+  const manualOverridesRef = React.useRef(new Set<string>())
+  const [, forceUpdate] = React.useReducer((x: number) => x + 1, 0)
   const hourlyRate = safeNum(form.watch('hourlyRate'))
   const entries = form.watch('hoursEntries')
   const total = entries.reduce((sum, e) => sum + safeNum(e.hours) * hourlyRate, 0)
-
-  React.useEffect(() => {
-    manualOverridesRef.current = manualOverrides
-  }, [manualOverrides])
 
   React.useEffect(() => {
     const subscription = form.watch((values) => {
@@ -66,12 +62,8 @@ function SingleColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) 
   }, [form])
 
   function resetDerived(roleName: string) {
-    setManualOverrides((prev) => {
-      const next = new Set(prev)
-      next.delete(roleName)
-      manualOverridesRef.current = next
-      return next
-    })
+    manualOverridesRef.current.delete(roleName)
+    forceUpdate()
     const currentEntries = form.getValues('hoursEntries')
     const { testingIdx, pmIdx, derivedTesting, derivedPm } = computeDerivedHours(
       currentEntries,
@@ -99,7 +91,7 @@ function SingleColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) 
           {fields.map((field, idx) => {
             const roleName = field.roleName
             const isDerived = roleName === TESTING_ROLE || roleName === PM_ROLE
-            const isOverridden = manualOverrides.has(roleName)
+            const isOverridden = manualOverridesRef.current.has(roleName)
             const hrs = safeNum(entries[idx]?.hours)
 
             const registerProps = form.register(`hoursEntries.${idx}.hours`, {
@@ -125,11 +117,8 @@ function SingleColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) 
                         {...registerProps}
                         onChange={(e) => {
                           registerProps.onChange(e)
-                          setManualOverrides((prev) => {
-                            const next = new Set([...prev, roleName])
-                            manualOverridesRef.current = next
-                            return next
-                          })
+                          manualOverridesRef.current.add(roleName)
+                          forceUpdate()
                         }}
                       />
                       {!isOverridden ? (
@@ -294,17 +283,12 @@ function BauForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
 function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
   const { fields } = useFieldArray({ control: form.control, name: 'hoursEntries' })
   const [selectedPackage, setSelectedPackage] = React.useState('')
-  const [manualOverrides, setManualOverrides] = React.useState<Set<string>>(new Set())
-  const manualOverridesRef = React.useRef(manualOverrides)
+  const manualOverridesRef = React.useRef(new Set<string>())
+  const [, forceUpdate] = React.useReducer((x: number) => x + 1, 0)
 
   const hourlyRate = safeNum(form.watch('hourlyRate'))
   const entries = form.watch('hoursEntries')
   const total = entries.reduce((sum, e) => sum + safeNum(e.hours) * hourlyRate, 0)
-
-  // Keep ref in sync so the subscription closure always sees the latest overrides
-  React.useEffect(() => {
-    manualOverridesRef.current = manualOverrides
-  }, [manualOverrides])
 
   // Subscription-based derived calculation — fires on every form value change,
   // bypassing render-cycle timing issues with uncontrolled form.register inputs.
@@ -340,8 +324,8 @@ function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
 
   function applyPackage(packageName: string) {
     setSelectedPackage(packageName)
-    setManualOverrides(new Set())
     manualOverridesRef.current = new Set()
+    forceUpdate()
     const pkg = AIR_WEBSITE_PACKAGES[packageName]
     if (pkg) {
       form.setValue(
@@ -352,16 +336,11 @@ function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
   }
 
   function resetDerived(roleName: string) {
-    setManualOverrides((prev) => {
-      const next = new Set(prev)
-      next.delete(roleName)
-      manualOverridesRef.current = next
-      return next
-    })
-    // Trigger subscription to recompute now that override is cleared
-    const entries = form.getValues('hoursEntries')
+    manualOverridesRef.current.delete(roleName)
+    forceUpdate()
+    const currentEntries = form.getValues('hoursEntries')
     const { testingIdx, pmIdx, derivedTesting, derivedPm } = computeDerivedHours(
-      entries,
+      currentEntries,
       manualOverridesRef.current
     )
     if (roleName === TESTING_ROLE && testingIdx >= 0) {
@@ -403,11 +382,9 @@ function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
             {fields.map((field, idx) => {
               const roleName = field.roleName
               const isDerived = roleName === TESTING_ROLE || roleName === PM_ROLE
-              const isOverridden = manualOverrides.has(roleName)
+              const isOverridden = manualOverridesRef.current.has(roleName)
               const hrs = safeNum(entries[idx]?.hours)
 
-              // For derived rows: spread register props but intercept onChange to track overrides.
-              // form.register is still used so the value is always included in form.getValues().
               const registerProps = form.register(`hoursEntries.${idx}.hours`, {
                 valueAsNumber: true,
               })
@@ -431,11 +408,8 @@ function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
                           {...registerProps}
                           onChange={(e) => {
                             registerProps.onChange(e)
-                            setManualOverrides((prev) => {
-                              const next = new Set([...prev, roleName])
-                              manualOverridesRef.current = next
-                              return next
-                            })
+                            manualOverridesRef.current.add(roleName)
+                            forceUpdate()
                           }}
                         />
                         {!isOverridden ? (

@@ -922,6 +922,14 @@ export function OrderForm({
   const [currentStepId, setCurrentStepId] = React.useState<string>(STEP_CUSTOMER)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const stepContainerRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    const el = stepContainerRef.current?.querySelector<HTMLElement>(
+      'input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]), select, textarea'
+    )
+    el?.focus()
+  }, [currentStepId])
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
@@ -1051,7 +1059,7 @@ export function OrderForm({
         <StepIndicator steps={indicatorSteps} />
       </div>
 
-      <div className="mb-8">{renderStep()}</div>
+      <div className="mb-8" ref={stepContainerRef}>{renderStep()}</div>
 
       {submitError && (
         <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">

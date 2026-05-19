@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { useFieldArray, type UseFormReturn } from 'react-hook-form'
+import { useFieldArray, useWatch, type Control, type UseFormReturn } from 'react-hook-form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -32,13 +32,81 @@ function MatrixTotalRow({ label, value }: { label: string; value: string }) {
   )
 }
 
+// These leaf components use useWatch so only they re-render when hours change,
+// not the parent components that contain the inputs.
+
+function SingleRowCost({
+  control,
+  idx,
+  hourlyRate,
+}: {
+  control: Control<OrderFormValues>
+  idx: number
+  hourlyRate: number
+}) {
+  const hours = useWatch({ control, name: `hoursEntries.${idx}.hours` as `hoursEntries.0.hours` })
+  return (
+    <td className="px-3 py-2 text-right text-muted-foreground">
+      {formatCurrency(safeNum(hours) * hourlyRate)}
+    </td>
+  )
+}
+
+function SingleMatrixTotal({
+  control,
+  hourlyRate,
+}: {
+  control: Control<OrderFormValues>
+  hourlyRate: number
+}) {
+  const entries = useWatch({ control, name: 'hoursEntries' })
+  const total = (entries ?? []).reduce((sum, e) => sum + safeNum(e?.hours) * hourlyRate, 0)
+  return <MatrixTotalRow label="Total" value={formatCurrency(total)} />
+}
+
+function TwoColRowCost({
+  control,
+  idx,
+  hourlyRate,
+}: {
+  control: Control<OrderFormValues>
+  idx: number
+  hourlyRate: number
+}) {
+  const setupHours = useWatch({
+    control,
+    name: `hoursEntries.${idx}.setupHours` as `hoursEntries.0.setupHours`,
+  })
+  const monthlyHours = useWatch({
+    control,
+    name: `hoursEntries.${idx}.monthlyHours` as `hoursEntries.0.monthlyHours`,
+  })
+  return (
+    <td className="px-3 py-2 text-right text-muted-foreground">
+      {formatCurrency((safeNum(setupHours) + safeNum(monthlyHours)) * hourlyRate)}
+    </td>
+  )
+}
+
+function TwoColMatrixTotal({
+  control,
+  hourlyRate,
+}: {
+  control: Control<OrderFormValues>
+  hourlyRate: number
+}) {
+  const entries = useWatch({ control, name: 'hoursEntries' })
+  const total = (entries ?? []).reduce(
+    (sum, e) => sum + (safeNum(e?.setupHours) + safeNum(e?.monthlyHours)) * hourlyRate,
+    0
+  )
+  return <MatrixTotalRow label="Total" value={formatCurrency(total)} />
+}
+
 function SingleColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) {
   const { fields } = useFieldArray({ control: form.control, name: 'hoursEntries' })
-  const manualOverridesRef = React.useRef(new Set<string>())
-  const [, forceUpdate] = React.useReducer((x: number) => x + 1, 0)
+  const [manualOverrides, setManualOverrides] = React.useState<Set<string>>(() => new Set())
   const hourlyRate = safeNum(form.watch('hourlyRate'))
-  const entries = form.watch('hoursEntries')
-  const total = entries.reduce((sum, e) => sum + safeNum(e.hours) * hourlyRate, 0)
 
   React.useEffect(() => {
     const subscription = form.watch((values) => {
@@ -48,17 +116,17 @@ function SingleColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) 
       }>
       const { testingIdx, pmIdx, derivedTesting, derivedPm } = computeDerivedHours(
         rawEntries,
-        manualOverridesRef.current
+        manualOverrides
       )
 
-      if (!manualOverridesRef.current.has(TESTING_ROLE) && testingIdx >= 0) {
+      if (!manualOverrides.has(TESTING_ROLE) && testingIdx >= 0) {
         const current = safeNum(rawEntries[testingIdx]?.hours)
         if (current !== derivedTesting) {
           form.setValue(`hoursEntries.${testingIdx}.hours`, derivedTesting, { shouldDirty: false })
         }
       }
 
-      if (!manualOverridesRef.current.has(PM_ROLE) && pmIdx >= 0) {
+      if (!manualOverrides.has(PM_ROLE) && pmIdx >= 0) {
         const current = safeNum(rawEntries[pmIdx]?.hours)
         if (current !== derivedPm) {
           form.setValue(`hoursEntries.${pmIdx}.hours`, derivedPm, { shouldDirty: false })
@@ -66,15 +134,16 @@ function SingleColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) 
       }
     })
     return () => subscription.unsubscribe()
-  }, [form])
+  }, [form, manualOverrides])
 
   function resetDerived(roleName: string) {
-    manualOverridesRef.current.delete(roleName)
-    forceUpdate()
+    const next = new Set(manualOverrides)
+    next.delete(roleName)
+    setManualOverrides(next)
     const currentEntries = form.getValues('hoursEntries')
     const { testingIdx, pmIdx, derivedTesting, derivedPm } = computeDerivedHours(
       currentEntries,
-      manualOverridesRef.current
+      next
     )
     if (roleName === TESTING_ROLE && testingIdx >= 0) {
       form.setValue(`hoursEntries.${testingIdx}.hours`, derivedTesting, { shouldDirty: false })
@@ -98,8 +167,7 @@ function SingleColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) 
           {fields.map((field, idx) => {
             const roleName = field.roleName
             const isDerived = roleName === TESTING_ROLE || roleName === PM_ROLE
-            const isOverridden = manualOverridesRef.current.has(roleName)
-            const hrs = safeNum(entries[idx]?.hours)
+            const isOverridden = manualOverrides.has(roleName)
 
             const registerProps = form.register(`hoursEntries.${idx}.hours`, {
               valueAsNumber: true,
@@ -120,12 +188,14 @@ function SingleColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) 
                       <Input
                         type="number"
                         min={0}
+                        placeholder="0"
                         className={cn('h-11 w-24', !isOverridden && 'bg-muted/50')}
                         {...registerProps}
                         onChange={(e) => {
                           registerProps.onChange(e)
-                          manualOverridesRef.current.add(roleName)
-                          forceUpdate()
+                          if (!manualOverrides.has(roleName)) {
+                            setManualOverrides((prev) => new Set(prev).add(roleName))
+                          }
                         }}
                       />
                       {!isOverridden ? (
@@ -146,20 +216,19 @@ function SingleColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) 
                     <Input
                       type="number"
                       min={0}
+                      placeholder="0"
                       className="h-11 w-24"
                       {...registerProps}
                     />
                   )}
                 </td>
-                <td className="px-3 py-2 text-right text-muted-foreground">
-                  {formatCurrency(hrs * hourlyRate)}
-                </td>
+                <SingleRowCost control={form.control} idx={idx} hourlyRate={hourlyRate} />
               </tr>
             )
           })}
         </tbody>
         <tfoot>
-          <MatrixTotalRow label="Total" value={formatCurrency(total)} />
+          <SingleMatrixTotal control={form.control} hourlyRate={hourlyRate} />
         </tfoot>
       </table>
     </div>
@@ -169,11 +238,6 @@ function SingleColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) 
 function TwoColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) {
   const { fields } = useFieldArray({ control: form.control, name: 'hoursEntries' })
   const hourlyRate = safeNum(form.watch('hourlyRate'))
-  const entries = form.watch('hoursEntries')
-  const total = entries.reduce(
-    (sum, e) => sum + (safeNum(e.setupHours) + safeNum(e.monthlyHours)) * hourlyRate,
-    0
-  )
 
   return (
     <div className="overflow-x-auto">
@@ -187,37 +251,33 @@ function TwoColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) {
           </tr>
         </thead>
         <tbody>
-          {fields.map((field, idx) => {
-            const rowCost =
-              (safeNum(entries[idx]?.setupHours) + safeNum(entries[idx]?.monthlyHours)) * hourlyRate
-            return (
-              <tr key={field.id} className="border-t border-border">
-                <td className="px-3 py-2">{field.roleName}</td>
-                <td className="px-3 py-2">
-                  <Input
-                    type="number"
-                    min={0}
-                    className="h-11 w-24"
-                    {...form.register(`hoursEntries.${idx}.setupHours`, { valueAsNumber: true })}
-                  />
-                </td>
-                <td className="px-3 py-2">
-                  <Input
-                    type="number"
-                    min={0}
-                    className="h-11 w-24"
-                    {...form.register(`hoursEntries.${idx}.monthlyHours`, { valueAsNumber: true })}
-                  />
-                </td>
-                <td className="px-3 py-2 text-right text-muted-foreground">
-                  {formatCurrency(rowCost)}
-                </td>
-              </tr>
-            )
-          })}
+          {fields.map((field, idx) => (
+            <tr key={field.id} className="border-t border-border">
+              <td className="px-3 py-2">{field.roleName}</td>
+              <td className="px-3 py-2">
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="0"
+                  className="h-11 w-24"
+                  {...form.register(`hoursEntries.${idx}.setupHours`, { valueAsNumber: true })}
+                />
+              </td>
+              <td className="px-3 py-2">
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="0"
+                  className="h-11 w-24"
+                  {...form.register(`hoursEntries.${idx}.monthlyHours`, { valueAsNumber: true })}
+                />
+              </td>
+              <TwoColRowCost control={form.control} idx={idx} hourlyRate={hourlyRate} />
+            </tr>
+          ))}
         </tbody>
         <tfoot>
-          <MatrixTotalRow label="Total" value={formatCurrency(total)} />
+          <TwoColMatrixTotal control={form.control} hourlyRate={hourlyRate} />
         </tfoot>
       </table>
     </div>
@@ -247,6 +307,7 @@ function BauForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
           <Input
             type="number"
             min={0}
+            placeholder="0"
             value={studioHours || ''}
             onChange={(e) =>
               updateBau(e.target.value === '' ? 0 : Number(e.target.value), marketingHours, months)
@@ -258,6 +319,7 @@ function BauForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
           <Input
             type="number"
             min={0}
+            placeholder="0"
             value={marketingHours || ''}
             onChange={(e) =>
               updateBau(studioHours, e.target.value === '' ? 0 : Number(e.target.value), months)
@@ -290,15 +352,10 @@ function BauForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
 function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
   const { fields } = useFieldArray({ control: form.control, name: 'hoursEntries' })
   const [selectedPackage, setSelectedPackage] = React.useState('')
-  const manualOverridesRef = React.useRef(new Set<string>())
-  const [, forceUpdate] = React.useReducer((x: number) => x + 1, 0)
+  const [manualOverrides, setManualOverrides] = React.useState<Set<string>>(() => new Set())
 
   const hourlyRate = safeNum(form.watch('hourlyRate'))
-  const entries = form.watch('hoursEntries')
-  const total = entries.reduce((sum, e) => sum + safeNum(e.hours) * hourlyRate, 0)
 
-  // Subscription-based derived calculation — fires on every form value change,
-  // bypassing render-cycle timing issues with uncontrolled form.register inputs.
   React.useEffect(() => {
     const subscription = form.watch((values) => {
       const rawEntries = (values.hoursEntries ?? []) as Array<{
@@ -307,10 +364,10 @@ function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
       }>
       const { testingIdx, pmIdx, derivedTesting, derivedPm } = computeDerivedHours(
         rawEntries,
-        manualOverridesRef.current
+        manualOverrides
       )
 
-      if (!manualOverridesRef.current.has(TESTING_ROLE) && testingIdx >= 0) {
+      if (!manualOverrides.has(TESTING_ROLE) && testingIdx >= 0) {
         const current = safeNum(rawEntries[testingIdx]?.hours)
         if (current !== derivedTesting) {
           form.setValue(`hoursEntries.${testingIdx}.hours`, derivedTesting, {
@@ -319,7 +376,7 @@ function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
         }
       }
 
-      if (!manualOverridesRef.current.has(PM_ROLE) && pmIdx >= 0) {
+      if (!manualOverrides.has(PM_ROLE) && pmIdx >= 0) {
         const current = safeNum(rawEntries[pmIdx]?.hours)
         if (current !== derivedPm) {
           form.setValue(`hoursEntries.${pmIdx}.hours`, derivedPm, { shouldDirty: false })
@@ -327,12 +384,11 @@ function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
       }
     })
     return () => subscription.unsubscribe()
-  }, [form])
+  }, [form, manualOverrides])
 
   function applyPackage(packageName: string) {
     setSelectedPackage(packageName)
-    manualOverridesRef.current = new Set()
-    forceUpdate()
+    setManualOverrides(new Set())
     const pkg = AIR_WEBSITE_PACKAGES[packageName]
     if (pkg) {
       form.setValue(
@@ -343,12 +399,13 @@ function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
   }
 
   function resetDerived(roleName: string) {
-    manualOverridesRef.current.delete(roleName)
-    forceUpdate()
+    const next = new Set(manualOverrides)
+    next.delete(roleName)
+    setManualOverrides(next)
     const currentEntries = form.getValues('hoursEntries')
     const { testingIdx, pmIdx, derivedTesting, derivedPm } = computeDerivedHours(
       currentEntries,
-      manualOverridesRef.current
+      next
     )
     if (roleName === TESTING_ROLE && testingIdx >= 0) {
       form.setValue(`hoursEntries.${testingIdx}.hours`, derivedTesting, { shouldDirty: false })
@@ -389,8 +446,7 @@ function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
             {fields.map((field, idx) => {
               const roleName = field.roleName
               const isDerived = roleName === TESTING_ROLE || roleName === PM_ROLE
-              const isOverridden = manualOverridesRef.current.has(roleName)
-              const hrs = safeNum(entries[idx]?.hours)
+              const isOverridden = manualOverrides.has(roleName)
 
               const registerProps = form.register(`hoursEntries.${idx}.hours`, {
                 valueAsNumber: true,
@@ -411,12 +467,14 @@ function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
                         <Input
                           type="number"
                           min={0}
+                          placeholder="0"
                           className={cn('h-11 w-24', !isOverridden && 'bg-muted/50')}
                           {...registerProps}
                           onChange={(e) => {
                             registerProps.onChange(e)
-                            manualOverridesRef.current.add(roleName)
-                            forceUpdate()
+                            if (!manualOverrides.has(roleName)) {
+                              setManualOverrides((prev) => new Set(prev).add(roleName))
+                            }
                           }}
                         />
                         {!isOverridden ? (
@@ -437,20 +495,19 @@ function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
                       <Input
                         type="number"
                         min={0}
+                        placeholder="0"
                         className="h-11 w-24"
                         {...registerProps}
                       />
                     )}
                   </td>
-                  <td className="px-3 py-2 text-right text-muted-foreground">
-                    {formatCurrency(hrs * hourlyRate)}
-                  </td>
+                  <SingleRowCost control={form.control} idx={idx} hourlyRate={hourlyRate} />
                 </tr>
               )
             })}
           </tbody>
           <tfoot>
-            <MatrixTotalRow label="Total" value={formatCurrency(total)} />
+            <SingleMatrixTotal control={form.control} hourlyRate={hourlyRate} />
           </tfoot>
         </table>
       </div>

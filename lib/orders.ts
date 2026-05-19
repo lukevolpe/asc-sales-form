@@ -100,6 +100,7 @@ export async function getOrder(id: string): Promise<FullOrder | null> {
 
 export type OrderListItem = {
   id: string;
+  displayId: number | null;
   companyName: string;
   projectName: string | null;
   salesperson: string;
@@ -212,6 +213,7 @@ export async function listOrders(query?: string): Promise<OrderListItem[]> {
 
     return {
       id: order.id,
+      displayId: order.displayId,
       companyName: order.companyName,
       projectName: order.projectName,
       salesperson: order.salesperson,

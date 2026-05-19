@@ -20,6 +20,7 @@ export function OrdersTable({ orders }: { orders: OrderListItem[] }) {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead>ID</TableHead>
             <TableHead>Client</TableHead>
             <TableHead>Project</TableHead>
             <TableHead>Salesperson</TableHead>
@@ -35,6 +36,9 @@ export function OrdersTable({ orders }: { orders: OrderListItem[] }) {
               className="cursor-pointer"
               onClick={() => router.push(`/orders/${order.id}`)}
             >
+              <TableCell className="font-mono text-xs text-muted-foreground">
+                {order.displayId != null ? `ID-${order.displayId}` : '—'}
+              </TableCell>
               <TableCell className="font-medium">
                 <span>{order.companyName}</span>
                 {order.isAmended && (

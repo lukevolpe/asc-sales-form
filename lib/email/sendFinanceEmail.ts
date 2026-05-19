@@ -7,6 +7,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 function buildHtml(params: {
   orderId: string;
+  displayId: number | null;
   companyName: string;
   projectName: string | null;
   salesperson: string;
@@ -23,6 +24,7 @@ function buildHtml(params: {
 }): string {
   const {
     orderId,
+    displayId,
     companyName,
     projectName,
     salesperson,
@@ -33,6 +35,8 @@ function buildHtml(params: {
     invoiceSchedule,
     appUrl,
   } = params;
+
+  const displayRef = displayId != null ? `ID-${displayId}` : '—';
 
   const orderUrl = `${appUrl}/orders/${orderId}`;
 
@@ -69,7 +73,7 @@ function buildHtml(params: {
     <tbody>
       <tr>
         <th style="text-align:left;padding:6px 10px;background:#f5f5f5;width:40%;">Order Reference</th>
-        <td style="padding:6px 10px;">${orderId}</td>
+        <td style="padding:6px 10px;">${displayRef}</td>
       </tr>
       <tr>
         <th style="text-align:left;padding:6px 10px;background:#f5f5f5;">Client</th>
@@ -144,15 +148,17 @@ export async function sendFinanceEmail(
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
 
   const clientLabel = `${order.companyName} / ${order.projectName ?? order.companyName}`;
+  const idLabel = order.displayId != null ? ` [ID-${order.displayId}]` : '';
   const subject = isAmended
-    ? `Amended Sales Order — ${clientLabel}`
-    : `New Sales Order — ${clientLabel}`;
+    ? `Amended Sales Order${idLabel} — ${clientLabel}`
+    : `New Sales Order${idLabel} — ${clientLabel}`;
 
   const to = process.env.FINANCE_EMAIL_TO ?? 'luke.volpe@gmail.com';
   const cc = process.env.FINANCE_EMAIL_CC;
 
   const html = buildHtml({
     orderId,
+    displayId: order.displayId,
     companyName: order.companyName,
     projectName: order.projectName,
     salesperson: order.salesperson,

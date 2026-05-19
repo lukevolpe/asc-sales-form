@@ -76,9 +76,12 @@ export async function createOrder(
 
   let orderId: string;
   try {
+    const maxResult = await db.order.aggregate({ _max: { displayId: true } });
+    const nextDisplayId = Math.max(1013, (maxResult._max.displayId ?? 1012) + 1);
+
     // create order scalars first
     const order = await db.order.create({
-      data: buildScalarFields(parsed.data),
+      data: { ...buildScalarFields(parsed.data), displayId: nextDisplayId },
     });
     orderId = order.id;
 

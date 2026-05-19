@@ -18,6 +18,9 @@ export function OrderCard({ order }: { order: OrderListItem }) {
           </span>
         )}
       </div>
+      <p className="text-xs font-mono text-muted-foreground">
+        {order.displayId != null ? `ID-${order.displayId}` : '—'}
+      </p>
       <p className="text-sm text-muted-foreground truncate">{order.projectName}</p>
       <p className="text-sm text-muted-foreground">
         {order.salesperson} · {order.requirementType}

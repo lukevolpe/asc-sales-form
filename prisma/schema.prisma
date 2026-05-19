@@ -39,6 +39,8 @@ model Order {
   projectDescription String?
   estimatedStartDate DateTime?
   estimatedEndDate   DateTime?
+  // Display ID — human-readable reference shown in UI and emails (e.g. ID-1013)
+  displayId   Int?     @unique
   // Metadata
   submittedAt DateTime @default(now())
   isAmended   Boolean  @default(false)

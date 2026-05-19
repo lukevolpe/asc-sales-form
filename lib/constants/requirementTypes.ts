@@ -35,14 +35,18 @@ export function getDefaultHoursEntries(requirementType: string): HoursEntryDefau
     case 'Studio Project':
     case 'Advancement of Existing Website':
     case 'Air Website':
-      return SINGLE_COLUMN_ROLES.map((role) => ({ roleName: role, hours: 0 }))
+      return SINGLE_COLUMN_ROLES.map((role) => ({ roleName: role, hours: undefined }))
     case 'Marketing Project':
     case 'B2B/B2C Lead Gen':
-      return TWO_COLUMN_CHANNELS.map((ch) => ({ roleName: ch, setupHours: 0, monthlyHours: 0 }))
+      return TWO_COLUMN_CHANNELS.map((ch) => ({
+        roleName: ch,
+        setupHours: undefined,
+        monthlyHours: undefined,
+      }))
     case 'BAU Retainer':
       return [
-        { roleName: 'Studio', monthlyHours: 0, months: 1 },
-        { roleName: 'Marketing', monthlyHours: 0, months: 1 },
+        { roleName: 'Studio', monthlyHours: undefined, months: 1 },
+        { roleName: 'Marketing', monthlyHours: undefined, months: 1 },
       ]
     default:
       return []

@@ -107,7 +107,9 @@ export default async function OrderPage({
           <p className="text-sm text-muted-foreground mt-0.5">
             {order.companyName} &middot; {order.requirementType}
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5 font-mono">#{order.id}</p>
+          <p className="text-xs text-muted-foreground mt-0.5 font-mono">
+            {order.displayId != null ? `ID-${order.displayId}` : '—'}
+          </p>
           <p className="text-xs text-muted-foreground mt-0.5">
             Submitted {order.submittedAt.toLocaleString("en-GB", {
               day: "numeric",

@@ -2,21 +2,29 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { useForm, useFieldArray } from "react-hook-form"
+import { useForm, useFieldArray, Controller } from "react-hook-form"
 import type { UseFormReturn } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { cn } from "@/lib/utils"
 import { StepIndicator, type FormStep } from "@/components/step-indicator"
 import { Button } from "@/components/ui/button"
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
+import { CardSelect } from "@/components/ui/card-select"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { orderFormSchema, type OrderFormValues } from "@/lib/schemas/order"
 import { SALESPEOPLE } from "@/lib/constants/salespeople"
 import {
   REQUIREMENT_TYPES,
   REQUIREMENT_SUB_TYPES,
   SUB_TYPE_REQUIRED_FOR,
-  requiresSubType,
   getDefaultHoursEntries,
 } from "@/lib/constants/requirementTypes"
 import { calculateOrderTotal } from "@/lib/orders"
@@ -121,42 +129,6 @@ function Field({
   )
 }
 
-function RadioGroup({
-  legend,
-  children,
-}: {
-  legend: string
-  children: React.ReactNode
-}) {
-  return (
-    <fieldset className="flex flex-col gap-2">
-      <legend className="text-sm font-medium">{legend}</legend>
-      <div className="flex flex-wrap gap-4">{children}</div>
-    </fieldset>
-  )
-}
-
-function RadioOption({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string
-  checked: boolean
-  onChange: () => void
-}) {
-  return (
-    <label className="flex items-center gap-2 cursor-pointer">
-      <input
-        type="radio"
-        className="accent-brand"
-        checked={checked}
-        onChange={onChange}
-      />
-      <span className="text-sm">{label}</span>
-    </label>
-  )
-}
 
 function NativeSelect({
   className,
@@ -165,7 +137,7 @@ function NativeSelect({
   return (
     <select
       className={cn(
-        "flex h-9 w-full cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none",
+        "flex h-11 w-full cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none",
         "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
         "disabled:cursor-not-allowed disabled:opacity-50",
         className
@@ -221,18 +193,16 @@ function CustomerInfoStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
         </Field>
       </div>
 
-      <RadioGroup legend="Customer type">
-        <RadioOption
-          label="Existing customer"
-          checked={!isNewCustomer}
-          onChange={() => setValue("isNewCustomer", false)}
-        />
-        <RadioOption
-          label="New customer"
-          checked={isNewCustomer}
-          onChange={() => setValue("isNewCustomer", true)}
-        />
-      </RadioGroup>
+      <CardSelect
+        legend="Customer type"
+        name="isNewCustomer"
+        value={isNewCustomer ? "new" : "existing"}
+        onChange={(v) => setValue("isNewCustomer", v === "new")}
+        options={[
+          { label: "Existing customer", value: "existing" },
+          { label: "New customer", value: "new" },
+        ]}
+      />
     </div>
   )
 }
@@ -304,18 +274,16 @@ function AccountContactStep({ form }: { form: UseFormReturn<OrderFormValues> }) 
 
   return (
     <div className="flex flex-col gap-6">
-      <RadioGroup legend="Accounts contact">
-        <RadioOption
-          label="Same as customer contact"
-          checked={accountSameAsCustomer}
-          onChange={() => setValue("accountSameAsCustomer", true)}
-        />
-        <RadioOption
-          label="Different contact"
-          checked={!accountSameAsCustomer}
-          onChange={() => setValue("accountSameAsCustomer", false)}
-        />
-      </RadioGroup>
+      <CardSelect
+        legend="Accounts contact"
+        name="accountSameAsCustomer"
+        value={accountSameAsCustomer ? "same" : "different"}
+        onChange={(v) => setValue("accountSameAsCustomer", v === "same")}
+        options={[
+          { label: "Same as customer contact", value: "same" },
+          { label: "Different contact", value: "different" },
+        ]}
+      />
 
       {!accountSameAsCustomer && (
         <div className="flex flex-col gap-4">
@@ -382,50 +350,56 @@ function SalesInfoStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
   return (
     <div className="flex flex-col gap-6">
       <Field label="Salesperson" required error={errors.salesperson?.message}>
-        <NativeSelect
-          {...register("salesperson")}
-          aria-invalid={!!errors.salesperson}
-          defaultValue=""
-        >
-          <option value="" disabled>
-            Select salesperson…
-          </option>
-          {SALESPEOPLE.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </NativeSelect>
+        <Controller
+          control={form.control}
+          name="salesperson"
+          render={({ field }) => (
+            <Select value={field.value || undefined} onValueChange={field.onChange}>
+              <SelectTrigger
+                className="h-11 w-full"
+                aria-invalid={!!errors.salesperson}
+              >
+                <SelectValue placeholder="Select salesperson…" />
+              </SelectTrigger>
+              <SelectContent>
+                {SALESPEOPLE.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
       </Field>
 
-      <RadioGroup legend="Type of requirement *">
-        {REQUIREMENT_TYPES.map((type) => (
-          <RadioOption
-            key={type}
-            label={type}
-            checked={requirementType === type}
-            onChange={() => handleTypeChange(type)}
-          />
-        ))}
-      </RadioGroup>
-      {errors.requirementType && (
-        <FieldError message={errors.requirementType.message} />
-      )}
+      <div className="flex flex-col gap-1.5">
+        <CardSelect
+          legend="Type of requirement *"
+          name="requirementType"
+          value={requirementType ?? ""}
+          onChange={handleTypeChange}
+          cols={3}
+          options={REQUIREMENT_TYPES.map((t) => ({ label: t, value: t }))}
+        />
+        {errors.requirementType && (
+          <FieldError message={errors.requirementType.message} />
+        )}
+      </div>
 
       {showSubType && (
-        <RadioGroup legend="Sub-type *">
-          {REQUIREMENT_SUB_TYPES.map((sub) => (
-            <RadioOption
-              key={sub}
-              label={sub}
-              checked={requirementSubType === sub}
-              onChange={() => setValue("requirementSubType", sub)}
-            />
-          ))}
-        </RadioGroup>
-      )}
-      {showSubType && errors.requirementSubType && (
-        <FieldError message={errors.requirementSubType.message} />
+        <div className="flex flex-col gap-1.5">
+          <CardSelect
+            legend="Sub-type *"
+            name="requirementSubType"
+            value={requirementSubType ?? ""}
+            onChange={(v) => setValue("requirementSubType", v)}
+            options={REQUIREMENT_SUB_TYPES.map((s) => ({ label: s, value: s }))}
+          />
+          {errors.requirementSubType && (
+            <FieldError message={errors.requirementSubType.message} />
+          )}
+        </div>
       )}
     </div>
   )
@@ -441,10 +415,10 @@ function HoursStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
 
 function RateStep({
   form,
-  attempted = false,
+  attempted,
 }: {
   form: UseFormReturn<OrderFormValues>
-  attempted?: boolean
+  attempted: boolean
 }) {
   const {
     register,
@@ -455,10 +429,19 @@ function RateStep({
   } = form
   const { fields, append, remove } = useFieldArray({ control, name: "invoiceSchedule" })
   const [rowModes, setRowModes] = React.useState<Record<string, "month" | "date">>({})
+  const newRowRef = React.useRef<HTMLInputElement | null>(null)
 
   const schedule = watch("invoiceSchedule")
   const total = schedule.reduce((sum, item) => sum + (item.percentage || 0), 0)
   const totalRounded = Math.round(total)
+
+  const prevLengthRef = React.useRef(fields.length)
+  React.useEffect(() => {
+    if (fields.length > prevLengthRef.current) {
+      newRowRef.current?.focus()
+    }
+    prevLengthRef.current = fields.length
+  }, [fields.length])
 
   // Infer mode from pre-populated data when no override exists in rowModes
   const getMode = (fieldId: string, index: number): "month" | "date" => {
@@ -530,6 +513,7 @@ function RateStep({
 
         {fields.map((field, index) => {
           const mode = getMode(field.id, index)
+          const isLastRow = index === fields.length - 1
           const rowErrors = attempted && Array.isArray(errors.invoiceSchedule)
             ? errors.invoiceSchedule[index]
             : undefined
@@ -561,15 +545,25 @@ function RateStep({
 
               {mode === "month" ? (
                 <Field label="Month no." error={rowErrors?.monthOffset?.message}>
-                  <Input
-                    type="number"
-                    min="1"
-                    {...register(`invoiceSchedule.${index}.monthOffset`, {
-                      valueAsNumber: true,
-                    })}
-                    className="w-24"
-                    placeholder="e.g. 3"
-                  />
+                  {(() => {
+                    const { ref: rhfRef, ...monthProps } = register(
+                      `invoiceSchedule.${index}.monthOffset`,
+                      { valueAsNumber: true }
+                    )
+                    return (
+                      <Input
+                        type="number"
+                        min="1"
+                        {...monthProps}
+                        ref={(el) => {
+                          rhfRef(el)
+                          if (isLastRow) newRowRef.current = el
+                        }}
+                        className="w-24"
+                        placeholder="e.g. 3"
+                      />
+                    )
+                  })()}
                 </Field>
               ) : (
                 <Field label="Date" error={rowErrors?.date?.message}>
@@ -1036,6 +1030,14 @@ export function OrderForm({
   const [submitError, setSubmitError] = React.useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [rateStepAttempted, setRateStepAttempted] = React.useState(false)
+  const stepContainerRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    const el = stepContainerRef.current?.querySelector<HTMLElement>(
+      'input:not([type="hidden"]):not([type="radio"]):not([type="checkbox"]), select, textarea'
+    )
+    el?.focus()
+  }, [currentStepId])
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
@@ -1152,20 +1154,34 @@ export function OrderForm({
   }
 
   const submitLabel = isLastStep
-    ? isSubmitting
-      ? isEditMode ? "Submitting…" : "Submitting…"
-      : isEditMode ? "Submit Amendment" : "Submit Order"
+    ? isEditMode ? "Submit Amendment" : "Submit Order"
     : "Next"
 
   return (
     <div className={cn("mx-auto max-w-2xl px-4 py-8 sm:px-6")}>
       <h1 className="mb-6 text-xl font-semibold">{pageTitle}</h1>
 
-      <div className="mb-8 overflow-x-auto pb-1">
+      <div className="mb-8">
         <StepIndicator steps={indicatorSteps} />
       </div>
 
-      <div className="mb-8">{renderStep()}</div>
+      <div
+        className="mb-8"
+        onKeyDown={(e) => {
+          if (
+            e.key === "Enter" &&
+            !isLastStep &&
+            (e.target as HTMLElement).tagName === "INPUT" &&
+            (e.target as HTMLInputElement).type !== "radio" &&
+            (e.target as HTMLInputElement).type !== "checkbox"
+          ) {
+            e.preventDefault()
+            goNext()
+          }
+        }}
+      >
+        {renderStep()}
+      </div>
 
       {submitError && (
         <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -1173,21 +1189,34 @@ export function OrderForm({
         </p>
       )}
 
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <Button
           type="button"
           variant="outline"
+          className="h-11 gap-2"
           onClick={goBack}
           disabled={currentStepIndex === 0 || isSubmitting}
         >
+          <ChevronLeft className="size-4" />
           Back
         </Button>
         <Button
           type="button"
+          className="h-11 gap-2"
           onClick={isLastStep ? form.handleSubmit(handleSubmit, handleInvalid) : goNext}
           disabled={isSubmitting}
         >
-          {submitLabel}
+          {isSubmitting ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Submitting…
+            </>
+          ) : (
+            <>
+              {submitLabel}
+              {!isLastStep && <ChevronRight className="size-4" />}
+            </>
+          )}
         </Button>
       </div>
     </div>

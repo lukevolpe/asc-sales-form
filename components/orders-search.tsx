@@ -40,7 +40,7 @@ export function OrdersSearch({ defaultValue }: { defaultValue?: string }) {
       value={value}
       onChange={handleChange}
       className={cn(
-        "h-8 w-64 rounded-md border border-input bg-background px-3 text-sm",
+        "h-11 w-full max-w-xs rounded-md border border-input bg-background px-3 text-sm",
         "placeholder:text-muted-foreground",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
       )}

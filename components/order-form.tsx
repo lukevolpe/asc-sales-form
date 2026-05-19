@@ -22,6 +22,7 @@ import {
 import { calculateOrderTotal } from "@/lib/orders"
 import { formatCurrency } from "@/lib/format"
 import { HoursMatrix } from "@/components/hours-matrix"
+import { HoursDisplay } from "@/components/hours-display"
 import { updateOrder } from "@/app/actions/orders"
 import type { FullOrder } from "@/lib/orders"
 import { orderToFormValues } from "@/lib/orders"
@@ -722,77 +723,6 @@ function SummaryRow({ label, value }: { label: string; value?: string | null }) 
   )
 }
 
-function ConfirmHoursTable({ form }: { form: UseFormReturn<OrderFormValues> }) {
-  const requirementType = form.watch("requirementType")
-  const entries = form.watch("hoursEntries")
-  const rate = safeNum(form.watch("hourlyRate"))
-
-  if (requirementType === "BAU Retainer") {
-    const studio = entries[0]
-    const marketing = entries[1]
-    const months = safeNum(studio?.months) || 1
-    const total =
-      (safeNum(studio?.monthlyHours) + safeNum(marketing?.monthlyHours)) * months * rate
-    return (
-      <div className="flex flex-col gap-2">
-        <SummaryRow label="Studio hrs/month" value={String(safeNum(studio?.monthlyHours))} />
-        <SummaryRow
-          label="Marketing hrs/month"
-          value={String(safeNum(marketing?.monthlyHours))}
-        />
-        <SummaryRow label="Months" value={String(months)} />
-        <SummaryRow label="Hours total value" value={formatCurrency(total)} />
-      </div>
-    )
-  }
-
-  const isTwoCol =
-    requirementType === "Marketing Project" || requirementType === "B2B/B2C Lead Gen"
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm border border-border rounded-lg overflow-hidden">
-        <thead>
-          <tr className="bg-muted/60 text-left">
-            <th className="px-3 py-2 font-medium w-2/5">{isTwoCol ? "Channel" : "Role"}</th>
-            {isTwoCol ? (
-              <>
-                <th className="px-3 py-2 font-medium">Setup Hrs</th>
-                <th className="px-3 py-2 font-medium">Monthly Hrs</th>
-              </>
-            ) : (
-              <th className="px-3 py-2 font-medium">Hours</th>
-            )}
-            <th className="px-3 py-2 font-medium text-right">Cost</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.map((entry, idx) => {
-            const cost = isTwoCol
-              ? (safeNum(entry.setupHours) + safeNum(entry.monthlyHours)) * rate
-              : safeNum(entry.hours) * rate
-            return (
-              <tr key={entry.roleName ?? idx} className="border-t border-border">
-                <td className="px-3 py-2">{entry.roleName}</td>
-                {isTwoCol ? (
-                  <>
-                    <td className="px-3 py-2">{safeNum(entry.setupHours)}</td>
-                    <td className="px-3 py-2">{safeNum(entry.monthlyHours)}</td>
-                  </>
-                ) : (
-                  <td className="px-3 py-2">{safeNum(entry.hours)}</td>
-                )}
-                <td className="px-3 py-2 text-right text-muted-foreground">
-                  {formatCurrency(cost)}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
-  )
-}
 
 function ConfirmStep({
   form,
@@ -864,7 +794,11 @@ function ConfirmStep({
       </SummaryCard>
 
       <SummaryCard title="Hours" onEdit={() => onGoToStep(STEP_HOURS)}>
-        <ConfirmHoursTable form={form} />
+        <HoursDisplay
+          requirementType={values.requirementType ?? ''}
+          hourlyRate={safeNum(values.hourlyRate)}
+          entries={values.hoursEntries}
+        />
       </SummaryCard>
 
       <SummaryCard title="Rate & Invoicing Schedule" onEdit={() => onGoToStep(STEP_RATE)}>

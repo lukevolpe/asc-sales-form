@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { cn } from "@/lib/utils"
 import { StepIndicator, type FormStep } from "@/components/step-indicator"
 import { Button } from "@/components/ui/button"
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { CardSelect } from "@/components/ui/card-select"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -1011,16 +1012,14 @@ export function OrderForm({
   }
 
   const submitLabel = isLastStep
-    ? isSubmitting
-      ? isEditMode ? "Submitting…" : "Submitting…"
-      : isEditMode ? "Submit Amendment" : "Submit Order"
+    ? isEditMode ? "Submit Amendment" : "Submit Order"
     : "Next"
 
   return (
     <div className={cn("mx-auto max-w-2xl px-4 py-8 sm:px-6")}>
       <h1 className="mb-6 text-xl font-semibold">{pageTitle}</h1>
 
-      <div className="mb-8 overflow-x-auto pb-1">
+      <div className="mb-8">
         <StepIndicator steps={indicatorSteps} />
       </div>
 
@@ -1048,21 +1047,34 @@ export function OrderForm({
         </p>
       )}
 
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <Button
           type="button"
           variant="outline"
+          className="h-11 gap-2"
           onClick={goBack}
           disabled={currentStepIndex === 0 || isSubmitting}
         >
+          <ChevronLeft className="size-4" />
           Back
         </Button>
         <Button
           type="button"
+          className="h-11 gap-2"
           onClick={isLastStep ? form.handleSubmit(handleSubmit, handleInvalid) : goNext}
           disabled={isSubmitting}
         >
-          {submitLabel}
+          {isSubmitting ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Submitting…
+            </>
+          ) : (
+            <>
+              {submitLabel}
+              {!isLastStep && <ChevronRight className="size-4" />}
+            </>
+          )}
         </Button>
       </div>
     </div>

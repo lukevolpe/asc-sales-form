@@ -106,6 +106,7 @@ export type OrderListItem = {
   requirementType: string;
   totalValue: number;
   submittedAt: Date;
+  isAmended: boolean;
 };
 
 export function orderToFormValues(order: FullOrder): OrderFormValues {
@@ -217,6 +218,7 @@ export async function listOrders(query?: string): Promise<OrderListItem[]> {
       requirementType: order.requirementType,
       totalValue,
       submittedAt: order.submittedAt,
+      isAmended: order.isAmended,
     };
   });
 }

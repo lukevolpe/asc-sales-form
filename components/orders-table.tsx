@@ -35,7 +35,14 @@ export function OrdersTable({ orders }: { orders: OrderListItem[] }) {
               className="cursor-pointer"
               onClick={() => router.push(`/orders/${order.id}`)}
             >
-              <TableCell className="font-medium">{order.companyName}</TableCell>
+              <TableCell className="font-medium">
+                <span>{order.companyName}</span>
+                {order.isAmended && (
+                  <span className="ml-2 inline-flex items-center rounded-full bg-brand/10 px-2 py-0.5 text-xs font-medium text-brand">
+                    Amended
+                  </span>
+                )}
+              </TableCell>
               <TableCell className="text-muted-foreground">
                 {order.projectName ?? "—"}
               </TableCell>
@@ -47,13 +54,9 @@ export function OrdersTable({ orders }: { orders: OrderListItem[] }) {
               <TableCell>
                 <time
                   dateTime={order.submittedAt.toISOString()}
-                  title={new Date(order.submittedAt).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
+                  title={formatRelativeDate(new Date(order.submittedAt))}
                 >
-                  {formatRelativeDate(new Date(order.submittedAt))}
+                  {formatDateTime(new Date(order.submittedAt))}
                 </time>
               </TableCell>
             </TableRow>
@@ -71,6 +74,16 @@ function formatCurrency(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+function formatDateTime(date: Date): string {
+  return date.toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
 }
 
 function formatRelativeDate(date: Date): string {

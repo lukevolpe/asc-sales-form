@@ -8,6 +8,7 @@ import { AIR_WEBSITE_PACKAGES, SINGLE_COLUMN_ROLES } from '@/lib/constants/airWe
 import { formatCurrency } from '@/lib/format'
 import type { OrderFormValues } from '@/lib/schemas/order'
 import { cn } from '@/lib/utils'
+import { computeDerivedHours, TESTING_ROLE, PM_ROLE } from '@/lib/orders'
 
 function safeNum(n: number | undefined | null): number {
   return Number.isFinite(n) ? (n ?? 0) : 0
@@ -288,34 +289,6 @@ function BauForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
       </p>
     </div>
   )
-}
-
-const TESTING_ROLE = 'Testing'
-const PM_ROLE = 'Project Management'
-
-function computeDerivedHours(
-  entries: Array<{ roleName?: string; hours?: number | null }>,
-  manualOverrides: Set<string>
-): { testingIdx: number; pmIdx: number; derivedTesting: number; derivedPm: number } {
-  const testingIdx = entries.findIndex((e) => e.roleName === TESTING_ROLE)
-  const pmIdx = entries.findIndex((e) => e.roleName === PM_ROLE)
-
-  const frontend = safeNum(entries.find((e) => e.roleName === 'Frontend')?.hours)
-  const backend = safeNum(entries.find((e) => e.roleName === 'Backend')?.hours)
-  const derivedTesting = Math.round((frontend + backend) * 0.25)
-
-  const effectiveTesting = manualOverrides.has(TESTING_ROLE)
-    ? safeNum(entries[testingIdx]?.hours)
-    : derivedTesting
-
-  const pmBase = entries.reduce((sum, e, idx) => {
-    if (idx === pmIdx) return sum
-    if (e.roleName === TESTING_ROLE) return sum + effectiveTesting
-    return sum + safeNum(e.hours)
-  }, 0)
-  const derivedPm = Math.round(pmBase * 0.2)
-
-  return { testingIdx, pmIdx, derivedTesting, derivedPm }
 }
 
 function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {

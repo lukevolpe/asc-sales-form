@@ -121,7 +121,7 @@ function SingleColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) 
                       <Input
                         type="number"
                         min={0}
-                        className={cn('h-8 w-24', !isOverridden && 'bg-muted/50')}
+                        className={cn('h-11 w-24', !isOverridden && 'bg-muted/50')}
                         {...registerProps}
                         onChange={(e) => {
                           registerProps.onChange(e)
@@ -150,7 +150,7 @@ function SingleColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) 
                     <Input
                       type="number"
                       min={0}
-                      className="h-8 w-24"
+                      className="h-11 w-24"
                       {...registerProps}
                     />
                   )}
@@ -201,7 +201,7 @@ function TwoColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) {
                   <Input
                     type="number"
                     min={0}
-                    className="h-8 w-24"
+                    className="h-11 w-24"
                     {...form.register(`hoursEntries.${idx}.setupHours`, { valueAsNumber: true })}
                   />
                 </td>
@@ -209,7 +209,7 @@ function TwoColumnMatrix({ form }: { form: UseFormReturn<OrderFormValues> }) {
                   <Input
                     type="number"
                     min={0}
-                    className="h-8 w-24"
+                    className="h-11 w-24"
                     {...form.register(`hoursEntries.${idx}.monthlyHours`, { valueAsNumber: true })}
                   />
                 </td>
@@ -427,7 +427,7 @@ function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
                         <Input
                           type="number"
                           min={0}
-                          className={cn('h-8 w-24', !isOverridden && 'bg-muted/50')}
+                          className={cn('h-11 w-24', !isOverridden && 'bg-muted/50')}
                           {...registerProps}
                           onChange={(e) => {
                             registerProps.onChange(e)
@@ -456,7 +456,7 @@ function AirWebsiteForm({ form }: { form: UseFormReturn<OrderFormValues> }) {
                       <Input
                         type="number"
                         min={0}
-                        className="h-8 w-24"
+                        className="h-11 w-24"
                         {...registerProps}
                       />
                     )}

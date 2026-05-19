@@ -165,7 +165,7 @@ function NativeSelect({
   return (
     <select
       className={cn(
-        "flex h-9 w-full cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none",
+        "flex h-11 w-full cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none",
         "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
         "disabled:cursor-not-allowed disabled:opacity-50",
         className
@@ -1051,7 +1051,23 @@ export function OrderForm({
         <StepIndicator steps={indicatorSteps} />
       </div>
 
-      <div className="mb-8">{renderStep()}</div>
+      <div
+        className="mb-8"
+        onKeyDown={(e) => {
+          if (
+            e.key === "Enter" &&
+            !isLastStep &&
+            (e.target as HTMLElement).tagName === "INPUT" &&
+            (e.target as HTMLInputElement).type !== "radio" &&
+            (e.target as HTMLInputElement).type !== "checkbox"
+          ) {
+            e.preventDefault()
+            goNext()
+          }
+        }}
+      >
+        {renderStep()}
+      </div>
 
       {submitError && (
         <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">

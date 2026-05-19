@@ -911,6 +911,8 @@ type OrderFormProps = {
   pageTitle?: string
 }
 
+const DRAFT_KEY = "asc-order-draft"
+
 export function OrderForm({
   defaultValues = NEW_ORDER_DEFAULTS,
   submitAction,
@@ -922,12 +924,47 @@ export function OrderForm({
   const [currentStepId, setCurrentStepId] = React.useState<string>(STEP_CUSTOMER)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [showDraftBanner, setShowDraftBanner] = React.useState(false)
+  const draftValuesRef = React.useRef<OrderFormValues | null>(null)
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
     defaultValues,
     mode: "onTouched",
   })
+
+  // Restore draft prompt (new orders only)
+  React.useEffect(() => {
+    if (isEditMode) return
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as OrderFormValues
+      if (parsed.companyName || parsed.projectName) {
+        draftValuesRef.current = parsed
+        setShowDraftBanner(true)
+      }
+    } catch {
+      // ignore malformed draft
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Persist form values to sessionStorage (new orders only, debounced 500ms)
+  React.useEffect(() => {
+    if (isEditMode) return
+    const sub = form.watch((values) => {
+      const timer = setTimeout(() => {
+        try {
+          sessionStorage.setItem(DRAFT_KEY, JSON.stringify(values))
+        } catch {
+          // ignore quota errors
+        }
+      }, 500)
+      return () => clearTimeout(timer)
+    })
+    return () => sub.unsubscribe()
+  }, [form, isEditMode])
 
   const isNewCustomer = form.watch("isNewCustomer")
 
@@ -979,6 +1016,18 @@ export function OrderForm({
 
   const isLastStep = currentStepIndex === visibleSteps.length - 1
 
+  const restoreDraft = () => {
+    if (draftValuesRef.current) {
+      form.reset(draftValuesRef.current)
+    }
+    setShowDraftBanner(false)
+  }
+
+  const dismissDraft = () => {
+    try { sessionStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
+    setShowDraftBanner(false)
+  }
+
   async function handleSubmit(values: OrderFormValues) {
     setSubmitError(null)
     setIsSubmitting(true)
@@ -988,6 +1037,7 @@ export function OrderForm({
         setSubmitError(result.error)
         return
       }
+      try { sessionStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
       onSuccess(result.id)
     } catch {
       setSubmitError('Something went wrong. Please try again.')
@@ -1046,6 +1096,28 @@ export function OrderForm({
   return (
     <div className={cn("mx-auto max-w-2xl px-4 py-8 sm:px-6")}>
       <h1 className="mb-6 text-xl font-semibold">{pageTitle}</h1>
+
+      {showDraftBanner && (
+        <div className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-brand/30 bg-brand/10 px-4 py-3 text-sm">
+          <span className="text-brand font-medium">You have an unsaved draft.</span>
+          <div className="flex gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={restoreDraft}
+              className="text-brand font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded"
+            >
+              Restore
+            </button>
+            <button
+              type="button"
+              onClick={dismissDraft}
+              className="text-muted-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand rounded"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mb-8 overflow-x-auto pb-1">
         <StepIndicator steps={indicatorSteps} />

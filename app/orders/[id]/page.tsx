@@ -109,7 +109,13 @@ export default async function OrderPage({
           </p>
           <p className="text-xs text-muted-foreground mt-0.5 font-mono">#{order.id}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Submitted {order.submittedAt.toLocaleDateString("en-GB", { dateStyle: "long" })}
+            Submitted {order.submittedAt.toLocaleString("en-GB", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
             {order.isAmended && (
               <span className="ml-2 text-brand font-medium">Amended</span>
             )}

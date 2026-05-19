@@ -855,84 +855,49 @@ function ConfirmStep({
   )
 }
 
-// ─── Step error detection ─────────────────────────────────────────────────────
+// ─── Step field map (single source of truth for which fields live in which step)
+
+const STEP_FIELD_MAP: Partial<Record<string, (keyof OrderFormValues)[]>> = {
+  [STEP_CUSTOMER]: ["companyName", "contactName", "email", "phone"],
+  [STEP_BILLING]: ["billingLine1", "billingTown", "billingPostcode", "billingCountry"],
+  [STEP_ACCOUNT_CONTACT]: ["accountCompanyName", "accountContactName", "accountEmail"],
+  [STEP_SALES_INFO]: ["salesperson", "requirementType", "requirementSubType"],
+  [STEP_HOURS]: ["hoursEntries"],
+  [STEP_RATE]: ["hourlyRate", "invoiceSchedule"],
+  [STEP_PROJECT]: ["projectName", "estimatedStartDate"],
+}
 
 function stepHasErrors(
   stepId: string,
   errors: UseFormReturn<OrderFormValues>["formState"]["errors"]
 ): boolean {
-  switch (stepId) {
-    case STEP_CUSTOMER:
-      return !!(
-        errors.companyName ||
-        errors.contactName ||
-        errors.email ||
-        errors.phone
-      )
-    case STEP_BILLING:
-      return !!(
-        errors.billingLine1 ||
-        errors.billingTown ||
-        errors.billingPostcode ||
-        errors.billingCountry
-      )
-    case STEP_ACCOUNT_CONTACT:
-      return !!(
-        errors.accountCompanyName ||
-        errors.accountContactName ||
-        errors.accountEmail
-      )
-    case STEP_SALES_INFO:
-      return !!(
-        errors.salesperson ||
-        errors.requirementType ||
-        errors.requirementSubType
-      )
-    case STEP_HOURS:
-      return !!errors.hoursEntries
-    case STEP_RATE: {
-      const scheduleRootError =
-        errors.invoiceSchedule && !Array.isArray(errors.invoiceSchedule)
-          ? true
-          : !!(errors.invoiceSchedule as { root?: unknown } | undefined)?.root
-      return !!(errors.hourlyRate || scheduleRootError)
-    }
-    case STEP_PROJECT:
-      return !!(errors.projectName || errors.estimatedStartDate)
-    default:
-      return false
+  if (stepId === STEP_RATE) {
+    const scheduleRootError =
+      errors.invoiceSchedule && !Array.isArray(errors.invoiceSchedule)
+        ? true
+        : !!(errors.invoiceSchedule as { root?: unknown } | undefined)?.root
+    return !!(errors.hourlyRate || scheduleRootError)
   }
+  const fields = STEP_FIELD_MAP[stepId] ?? []
+  return fields.some((f) => !!errors[f])
 }
-
-// ─── Fields to validate per step ─────────────────────────────────────────────
 
 function getStepFields(
   stepId: string,
   values: OrderFormValues
 ): (keyof OrderFormValues)[] {
-  switch (stepId) {
-    case STEP_CUSTOMER:
-      return ["companyName", "contactName", "email", "phone"]
-    case STEP_BILLING:
-      return ["billingLine1", "billingTown", "billingPostcode", "billingCountry"]
-    case STEP_ACCOUNT_CONTACT:
-      return values.accountSameAsCustomer
-        ? []
-        : ["accountCompanyName", "accountContactName", "accountEmail"]
-    case STEP_SALES_INFO: {
-      const fields: (keyof OrderFormValues)[] = ["salesperson", "requirementType"]
-      if (SUB_TYPE_REQUIRED_FOR.includes(values.requirementType ?? "")) {
-        fields.push("requirementSubType")
-      }
-      return fields
-    }
-    case STEP_HOURS:
-      return []
-    case STEP_RATE:
-      return ["hourlyRate", "invoiceSchedule"]
-    default:
-      return []
+  if (stepId === STEP_ACCOUNT_CONTACT) {
+    return values.accountSameAsCustomer ? [] : (STEP_FIELD_MAP[STEP_ACCOUNT_CONTACT] ?? [])
   }
+  if (stepId === STEP_SALES_INFO) {
+    const fields: (keyof OrderFormValues)[] = ["salesperson", "requirementType"]
+    if (SUB_TYPE_REQUIRED_FOR.includes(values.requirementType ?? "")) {
+      fields.push("requirementSubType")
+    }
+    return fields
+  }
+  if (stepId === STEP_HOURS) return []
+  return STEP_FIELD_MAP[stepId] ?? []
 }
 
 // ─── Main OrderForm component ─────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { useForm, useFieldArray } from "react-hook-form"
+import { useForm, useFieldArray, Controller } from "react-hook-form"
 import type { UseFormReturn } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { cn } from "@/lib/utils"
@@ -10,6 +10,13 @@ import { StepIndicator, type FormStep } from "@/components/step-indicator"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { orderFormSchema, type OrderFormValues } from "@/lib/schemas/order"
 import { SALESPEOPLE } from "@/lib/constants/salespeople"
 import {
@@ -158,22 +165,6 @@ function RadioOption({
   )
 }
 
-function NativeSelect({
-  className,
-  ...props
-}: React.ComponentProps<"select">) {
-  return (
-    <select
-      className={cn(
-        "flex h-9 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none",
-        "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-        "disabled:cursor-not-allowed disabled:opacity-50",
-        className
-      )}
-      {...props}
-    />
-  )
-}
 
 // ─── Step 1: Customer Information ────────────────────────────────────────────
 
@@ -382,20 +373,27 @@ function SalesInfoStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
   return (
     <div className="flex flex-col gap-6">
       <Field label="Salesperson" required error={errors.salesperson?.message}>
-        <NativeSelect
-          {...register("salesperson")}
-          aria-invalid={!!errors.salesperson}
-          defaultValue=""
-        >
-          <option value="" disabled>
-            Select salesperson…
-          </option>
-          {SALESPEOPLE.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </NativeSelect>
+        <Controller
+          control={form.control}
+          name="salesperson"
+          render={({ field }) => (
+            <Select value={field.value || undefined} onValueChange={field.onChange}>
+              <SelectTrigger
+                className="h-11 w-full"
+                aria-invalid={!!errors.salesperson}
+              >
+                <SelectValue placeholder="Select salesperson…" />
+              </SelectTrigger>
+              <SelectContent>
+                {SALESPEOPLE.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
       </Field>
 
       <RadioGroup legend="Type of requirement *">

@@ -470,7 +470,7 @@ function RateStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
   }
 
   const addMilestone = () => {
-    append({ percentage: 0 })
+    append({ percentage: undefined as unknown as number })
   }
 
   const removeRow = (index: number, fieldId: string) => {

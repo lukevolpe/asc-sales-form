@@ -4,6 +4,7 @@ import { listOrders } from "@/lib/orders"
 import { Button } from "@/components/ui/button"
 import { OrdersSearch } from "@/components/orders-search"
 import { OrdersTable } from "@/components/orders-table"
+import { OrderCard } from "@/components/order-card"
 import { SuccessBanner } from "@/components/success-banner"
 
 export default async function OrdersPage({
@@ -43,7 +44,16 @@ export default async function OrdersPage({
           )}
         </div>
       ) : (
-        <OrdersTable orders={orders} />
+        <>
+          <div className="flex flex-col gap-2 md:hidden">
+            {orders.map((order) => (
+              <OrderCard key={order.id} order={order} />
+            ))}
+          </div>
+          <div className="hidden md:block">
+            <OrdersTable orders={orders} />
+          </div>
+        </>
       )}
     </div>
   )

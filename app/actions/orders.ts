@@ -3,7 +3,6 @@
 import { db } from '@/lib/db';
 import { orderFormSchema, type OrderFormValues } from '@/lib/schemas/order';
 import {
-  buildOrderUpdateData,
   buildScalarFields,
   mapHoursEntries,
   mapInvoiceSchedule,
@@ -24,7 +23,11 @@ export async function updateOrder(
   try {
     await db.order.update({
       where: { id },
-      data: buildScalarFields(parsed.data),
+      data: {
+        ...buildScalarFields(parsed.data),
+        isAmended: true,
+        amendedAt: new Date(),
+      },
     });
 
     // Replace related rows without using a transaction (some adapters don't support transactions)

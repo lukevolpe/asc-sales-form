@@ -83,27 +83,6 @@ export function mapInvoiceSchedule(
   }));
 }
 
-export function buildOrderCreateData(v: OrderFormValues) {
-  return {
-    ...buildScalarFields(v),
-    hoursEntries: { create: mapHoursEntries(v.hoursEntries) },
-    invoiceSchedule: { create: mapInvoiceSchedule(v.invoiceSchedule) },
-  };
-}
-
-export function buildOrderUpdateData(v: OrderFormValues) {
-  return {
-    ...buildScalarFields(v),
-    isAmended: true,
-    amendedAt: new Date(),
-    hoursEntries: { deleteMany: {}, create: mapHoursEntries(v.hoursEntries) },
-    invoiceSchedule: {
-      deleteMany: {},
-      create: mapInvoiceSchedule(v.invoiceSchedule),
-    },
-  };
-}
-
 export type FullOrder = Order & {
   hoursEntries: HoursEntry[];
   invoiceSchedule: InvoiceScheduleItem[];

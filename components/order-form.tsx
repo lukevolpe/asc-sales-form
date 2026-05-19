@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { useForm, useFieldArray } from "react-hook-form"
+import { useForm, useFieldArray, Controller } from "react-hook-form"
 import type { UseFormReturn } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { cn } from "@/lib/utils"
@@ -11,6 +11,13 @@ import { Button } from "@/components/ui/button"
 import { CardSelect } from "@/components/ui/card-select"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { orderFormSchema, type OrderFormValues } from "@/lib/schemas/order"
 import { SALESPEOPLE } from "@/lib/constants/salespeople"
 import {
@@ -342,20 +349,27 @@ function SalesInfoStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
   return (
     <div className="flex flex-col gap-6">
       <Field label="Salesperson" required error={errors.salesperson?.message}>
-        <NativeSelect
-          {...register("salesperson")}
-          aria-invalid={!!errors.salesperson}
-          defaultValue=""
-        >
-          <option value="" disabled>
-            Select salesperson…
-          </option>
-          {SALESPEOPLE.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </NativeSelect>
+        <Controller
+          control={form.control}
+          name="salesperson"
+          render={({ field }) => (
+            <Select value={field.value || undefined} onValueChange={field.onChange}>
+              <SelectTrigger
+                className="h-11 w-full"
+                aria-invalid={!!errors.salesperson}
+              >
+                <SelectValue placeholder="Select salesperson…" />
+              </SelectTrigger>
+              <SelectContent>
+                {SALESPEOPLE.map((name) => (
+                  <SelectItem key={name} value={name}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
       </Field>
 
       <div className="flex flex-col gap-1.5">

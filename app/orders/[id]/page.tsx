@@ -7,6 +7,7 @@ import { formatCurrency } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import { SuccessBanner } from "@/components/success-banner"
 import { CopyTsvButton } from "@/components/copy-tsv-button"
+import { HoursDisplay } from "@/components/hours-display"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -31,87 +32,6 @@ function Row({ label, value }: { label: string; value?: string | null }) {
     <div className="flex gap-2 text-sm">
       <span className="text-muted-foreground w-40 shrink-0">{label}</span>
       <span>{value}</span>
-    </div>
-  )
-}
-
-// ─── Hours Table ──────────────────────────────────────────────────────────────
-
-function HoursTable({ order }: { order: FullOrder }) {
-  const { requirementType, hoursEntries, hourlyRate } = order
-
-  if (requirementType === "BAU Retainer") {
-    const studio = hoursEntries[0]
-    const marketing = hoursEntries[1]
-    const months = safeNum(studio?.months) || 1
-    const total = (safeNum(studio?.monthlyHours) + safeNum(marketing?.monthlyHours)) * months * hourlyRate
-    return (
-      <div className="flex flex-col gap-2 text-sm">
-        <Row label="Studio hrs/month" value={String(safeNum(studio?.monthlyHours))} />
-        <Row label="Marketing hrs/month" value={String(safeNum(marketing?.monthlyHours))} />
-        <Row label="Months" value={String(months)} />
-        <Row label="Hours total value" value={formatCurrency(total)} />
-      </div>
-    )
-  }
-
-  const isTwoCol =
-    requirementType === "Marketing Project" || requirementType === "B2B/B2C Lead Gen"
-
-  const grandTotal = hoursEntries.reduce((sum, e) => {
-    const cost = isTwoCol
-      ? (safeNum(e.setupHours) + safeNum(e.monthlyHours)) * hourlyRate
-      : safeNum(e.hours) * hourlyRate
-    return sum + cost
-  }, 0)
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm border border-border rounded-lg overflow-hidden">
-        <thead>
-          <tr className="bg-muted/60 text-left">
-            <th className="px-3 py-2 font-medium w-2/5">{isTwoCol ? "Channel" : "Role"}</th>
-            {isTwoCol ? (
-              <>
-                <th className="px-3 py-2 font-medium">Setup Hrs</th>
-                <th className="px-3 py-2 font-medium">Monthly Hrs</th>
-              </>
-            ) : (
-              <th className="px-3 py-2 font-medium">Hours</th>
-            )}
-            <th className="px-3 py-2 font-medium text-right">Cost</th>
-          </tr>
-        </thead>
-        <tbody>
-          {hoursEntries.map((e) => {
-            const cost = isTwoCol
-              ? (safeNum(e.setupHours) + safeNum(e.monthlyHours)) * hourlyRate
-              : safeNum(e.hours) * hourlyRate
-            return (
-              <tr key={e.id} className="border-t border-border">
-                <td className="px-3 py-2">{e.roleName}</td>
-                {isTwoCol ? (
-                  <>
-                    <td className="px-3 py-2">{safeNum(e.setupHours)}</td>
-                    <td className="px-3 py-2">{safeNum(e.monthlyHours)}</td>
-                  </>
-                ) : (
-                  <td className="px-3 py-2">{safeNum(e.hours)}</td>
-                )}
-                <td className="px-3 py-2 text-right text-muted-foreground">{formatCurrency(cost)}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-        <tfoot>
-          <tr className="border-t border-border bg-muted/40 font-medium">
-            <td className="px-3 py-2" colSpan={isTwoCol ? 3 : 2}>
-              Total
-            </td>
-            <td className="px-3 py-2 text-right">{formatCurrency(grandTotal)}</td>
-          </tr>
-        </tfoot>
-      </table>
     </div>
   )
 }
@@ -258,7 +178,11 @@ export default async function OrderPage({
 
       {/* Hours */}
       <SectionCard title="Hours">
-        <HoursTable order={order} />
+        <HoursDisplay
+          requirementType={order.requirementType}
+          hourlyRate={order.hourlyRate}
+          entries={order.hoursEntries}
+        />
       </SectionCard>
 
       {/* Rate & Costs */}

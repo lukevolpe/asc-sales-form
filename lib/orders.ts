@@ -83,27 +83,6 @@ export function mapInvoiceSchedule(
   }));
 }
 
-export function buildOrderCreateData(v: OrderFormValues) {
-  return {
-    ...buildScalarFields(v),
-    hoursEntries: { create: mapHoursEntries(v.hoursEntries) },
-    invoiceSchedule: { create: mapInvoiceSchedule(v.invoiceSchedule) },
-  };
-}
-
-export function buildOrderUpdateData(v: OrderFormValues) {
-  return {
-    ...buildScalarFields(v),
-    isAmended: true,
-    amendedAt: new Date(),
-    hoursEntries: { deleteMany: {}, create: mapHoursEntries(v.hoursEntries) },
-    invoiceSchedule: {
-      deleteMany: {},
-      create: mapInvoiceSchedule(v.invoiceSchedule),
-    },
-  };
-}
-
 export type FullOrder = Order & {
   hoursEntries: HoursEntry[];
   invoiceSchedule: InvoiceScheduleItem[];
@@ -174,6 +153,42 @@ export function orderToFormValues(order: FullOrder): OrderFormValues {
       : '',
   };
 }
+
+// ─── Derived hours computation ───────────────────────────────────────────────
+
+export const TESTING_ROLE = 'Testing'
+export const PM_ROLE = 'Project Management'
+
+function safeNumLib(n: number | undefined | null): number {
+  return Number.isFinite(n) ? (n ?? 0) : 0
+}
+
+export function computeDerivedHours(
+  entries: Array<{ roleName?: string; hours?: number | null }>,
+  manualOverrides: Set<string>,
+): { testingIdx: number; pmIdx: number; derivedTesting: number; derivedPm: number } {
+  const testingIdx = entries.findIndex((e) => e.roleName === TESTING_ROLE)
+  const pmIdx = entries.findIndex((e) => e.roleName === PM_ROLE)
+
+  const frontend = safeNumLib(entries.find((e) => e.roleName === 'Frontend')?.hours)
+  const backend = safeNumLib(entries.find((e) => e.roleName === 'Backend')?.hours)
+  const derivedTesting = Math.round((frontend + backend) * 0.25)
+
+  const effectiveTesting = manualOverrides.has(TESTING_ROLE)
+    ? safeNumLib(entries[testingIdx]?.hours)
+    : derivedTesting
+
+  const pmBase = entries.reduce((sum, e, idx) => {
+    if (idx === pmIdx) return sum
+    if (e.roleName === TESTING_ROLE) return sum + effectiveTesting
+    return sum + safeNumLib(e.hours)
+  }, 0)
+  const derivedPm = Math.round(pmBase * 0.2)
+
+  return { testingIdx, pmIdx, derivedTesting, derivedPm }
+}
+
+// ─── Order list ───────────────────────────────────────────────────────────────
 
 export async function listOrders(query?: string): Promise<OrderListItem[]> {
   const orders = await db.order.findMany({

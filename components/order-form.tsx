@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { cn } from "@/lib/utils"
 import { StepIndicator, type FormStep } from "@/components/step-indicator"
 import { Button } from "@/components/ui/button"
+import { CardSelect } from "@/components/ui/card-select"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -23,7 +24,6 @@ import {
   REQUIREMENT_TYPES,
   REQUIREMENT_SUB_TYPES,
   SUB_TYPE_REQUIRED_FOR,
-  requiresSubType,
   getDefaultHoursEntries,
 } from "@/lib/constants/requirementTypes"
 import { calculateOrderTotal } from "@/lib/orders"
@@ -128,43 +128,23 @@ function Field({
   )
 }
 
-function RadioGroup({
-  legend,
-  children,
-}: {
-  legend: string
-  children: React.ReactNode
-}) {
+
+function NativeSelect({
+  className,
+  ...props
+}: React.ComponentProps<"select">) {
   return (
-    <fieldset className="flex flex-col gap-2">
-      <legend className="text-sm font-medium">{legend}</legend>
-      <div className="flex flex-wrap gap-4">{children}</div>
-    </fieldset>
+    <select
+      className={cn(
+        "flex h-11 w-full cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none",
+        "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+        "disabled:cursor-not-allowed disabled:opacity-50",
+        className
+      )}
+      {...props}
+    />
   )
 }
-
-function RadioOption({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string
-  checked: boolean
-  onChange: () => void
-}) {
-  return (
-    <label className="flex items-center gap-2 cursor-pointer">
-      <input
-        type="radio"
-        className="accent-brand"
-        checked={checked}
-        onChange={onChange}
-      />
-      <span className="text-sm">{label}</span>
-    </label>
-  )
-}
-
 
 // ─── Step 1: Customer Information ────────────────────────────────────────────
 
@@ -212,18 +192,16 @@ function CustomerInfoStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
         </Field>
       </div>
 
-      <RadioGroup legend="Customer type">
-        <RadioOption
-          label="Existing customer"
-          checked={!isNewCustomer}
-          onChange={() => setValue("isNewCustomer", false)}
-        />
-        <RadioOption
-          label="New customer"
-          checked={isNewCustomer}
-          onChange={() => setValue("isNewCustomer", true)}
-        />
-      </RadioGroup>
+      <CardSelect
+        legend="Customer type"
+        name="isNewCustomer"
+        value={isNewCustomer ? "new" : "existing"}
+        onChange={(v) => setValue("isNewCustomer", v === "new")}
+        options={[
+          { label: "Existing customer", value: "existing" },
+          { label: "New customer", value: "new" },
+        ]}
+      />
     </div>
   )
 }
@@ -295,18 +273,16 @@ function AccountContactStep({ form }: { form: UseFormReturn<OrderFormValues> }) 
 
   return (
     <div className="flex flex-col gap-6">
-      <RadioGroup legend="Accounts contact">
-        <RadioOption
-          label="Same as customer contact"
-          checked={accountSameAsCustomer}
-          onChange={() => setValue("accountSameAsCustomer", true)}
-        />
-        <RadioOption
-          label="Different contact"
-          checked={!accountSameAsCustomer}
-          onChange={() => setValue("accountSameAsCustomer", false)}
-        />
-      </RadioGroup>
+      <CardSelect
+        legend="Accounts contact"
+        name="accountSameAsCustomer"
+        value={accountSameAsCustomer ? "same" : "different"}
+        onChange={(v) => setValue("accountSameAsCustomer", v === "same")}
+        options={[
+          { label: "Same as customer contact", value: "same" },
+          { label: "Different contact", value: "different" },
+        ]}
+      />
 
       {!accountSameAsCustomer && (
         <div className="flex flex-col gap-4">
@@ -396,34 +372,33 @@ function SalesInfoStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
         />
       </Field>
 
-      <RadioGroup legend="Type of requirement *">
-        {REQUIREMENT_TYPES.map((type) => (
-          <RadioOption
-            key={type}
-            label={type}
-            checked={requirementType === type}
-            onChange={() => handleTypeChange(type)}
-          />
-        ))}
-      </RadioGroup>
-      {errors.requirementType && (
-        <FieldError message={errors.requirementType.message} />
-      )}
+      <div className="flex flex-col gap-1.5">
+        <CardSelect
+          legend="Type of requirement *"
+          name="requirementType"
+          value={requirementType ?? ""}
+          onChange={handleTypeChange}
+          cols={3}
+          options={REQUIREMENT_TYPES.map((t) => ({ label: t, value: t }))}
+        />
+        {errors.requirementType && (
+          <FieldError message={errors.requirementType.message} />
+        )}
+      </div>
 
       {showSubType && (
-        <RadioGroup legend="Sub-type *">
-          {REQUIREMENT_SUB_TYPES.map((sub) => (
-            <RadioOption
-              key={sub}
-              label={sub}
-              checked={requirementSubType === sub}
-              onChange={() => setValue("requirementSubType", sub)}
-            />
-          ))}
-        </RadioGroup>
-      )}
-      {showSubType && errors.requirementSubType && (
-        <FieldError message={errors.requirementSubType.message} />
+        <div className="flex flex-col gap-1.5">
+          <CardSelect
+            legend="Sub-type *"
+            name="requirementSubType"
+            value={requirementSubType ?? ""}
+            onChange={(v) => setValue("requirementSubType", v)}
+            options={REQUIREMENT_SUB_TYPES.map((s) => ({ label: s, value: s }))}
+          />
+          {errors.requirementSubType && (
+            <FieldError message={errors.requirementSubType.message} />
+          )}
+        </div>
       )}
     </div>
   )
@@ -468,7 +443,7 @@ function RateStep({ form }: { form: UseFormReturn<OrderFormValues> }) {
   }
 
   const addMilestone = () => {
-    append({ percentage: 0 })
+    append({ percentage: undefined as unknown as number })
   }
 
   const removeRow = (index: number, fieldId: string) => {
@@ -1049,7 +1024,23 @@ export function OrderForm({
         <StepIndicator steps={indicatorSteps} />
       </div>
 
-      <div className="mb-8">{renderStep()}</div>
+      <div
+        className="mb-8"
+        onKeyDown={(e) => {
+          if (
+            e.key === "Enter" &&
+            !isLastStep &&
+            (e.target as HTMLElement).tagName === "INPUT" &&
+            (e.target as HTMLInputElement).type !== "radio" &&
+            (e.target as HTMLInputElement).type !== "checkbox"
+          ) {
+            e.preventDefault()
+            goNext()
+          }
+        }}
+      >
+        {renderStep()}
+      </div>
 
       {submitError && (
         <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">

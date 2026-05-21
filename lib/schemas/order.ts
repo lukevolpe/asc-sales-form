@@ -46,6 +46,7 @@ export const orderFormSchema = z
     additionalOutcosts: z.number().optional(),
 
     // Step 6 — Invoicing Schedule
+    invoiceScheduleMode: z.enum(['deposit', 'milestones']),
     invoiceSchedule: z.array(
       z.object({
         monthOffset: z.number().int().optional(),

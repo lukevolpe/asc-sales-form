@@ -40,6 +40,7 @@ function Row({ label, value }: { label: string; value?: string | null }) {
 
 function InvoiceScheduleTable({ order, total }: { order: FullOrder; total: number }) {
   const { invoiceSchedule } = order
+  const isDepositMode = order.invoiceScheduleMode === 'deposit'
   if (invoiceSchedule.length === 0) return <p className="text-sm text-muted-foreground">No schedule set.</p>
 
   return (
@@ -47,7 +48,7 @@ function InvoiceScheduleTable({ order, total }: { order: FullOrder; total: numbe
       <table className="w-full text-sm border border-border rounded-lg overflow-hidden">
         <thead>
           <tr className="bg-muted/60 text-left">
-            <th className="px-3 py-2 font-medium">Milestone</th>
+            <th className="px-3 py-2 font-medium">{isDepositMode ? 'Invoice' : 'Milestone'}</th>
             <th className="px-3 py-2 font-medium text-right">%</th>
             <th className="px-3 py-2 font-medium text-right">Cost</th>
           </tr>
@@ -56,11 +57,13 @@ function InvoiceScheduleTable({ order, total }: { order: FullOrder; total: numbe
           {invoiceSchedule.map((item, idx) => (
             <tr key={item.id} className="border-t border-border">
               <td className="px-3 py-2">
-                {item.date
-                  ? new Date(item.date).toLocaleDateString("en-GB")
-                  : item.monthOffset
-                    ? `Month ${item.monthOffset}`
-                    : `Milestone ${idx + 1}`}
+                {isDepositMode
+                  ? 'Deposit'
+                  : item.date
+                    ? new Date(item.date).toLocaleDateString("en-GB")
+                    : item.monthOffset
+                      ? `Month ${item.monthOffset}`
+                      : `Milestone ${idx + 1}`}
               </td>
               <td className="px-3 py-2 text-right">{item.percentage}%</td>
               <td className="px-3 py-2 text-right">{formatCurrency((item.percentage / 100) * total)}</td>

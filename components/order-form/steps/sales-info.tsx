@@ -52,7 +52,7 @@ export function SalesInfoStep({
           render={({ field }) => (
             <Select value={field.value ?? ''} onValueChange={field.onChange}>
               <SelectTrigger
-                className="h-11 w-full"
+                className="w-full"
                 aria-invalid={!!errors.salesperson}
               >
                 <SelectValue placeholder="Select salesperson…" />

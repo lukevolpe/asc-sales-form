@@ -25,7 +25,7 @@ export function RateStep({
     setValue,
     formState: { errors },
   } = form;
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: 'invoiceSchedule',
   });
@@ -35,6 +35,7 @@ export function RateStep({
   const newRowRef = React.useRef<HTMLInputElement | null>(null);
 
   const schedule = watch('invoiceSchedule');
+  const invoiceScheduleMode = watch('invoiceScheduleMode');
   const total = schedule.reduce((sum, item) => sum + (item.percentage || 0), 0);
   const totalRounded = Math.round(total);
 
@@ -46,26 +47,17 @@ export function RateStep({
     prevLengthRef.current = fields.length;
   }, [fields.length]);
 
-  // Clear the opposite field after mode state has been applied to avoid racing
-  // with RHF's setValue triggering a re-render before setRowModes resolves.
-  React.useEffect(() => {
-    fields.forEach((field, idx) => {
-      const mode = rowModes[field.id];
-      if (!mode) return;
-      if (mode === 'month') {
-        setValue(`invoiceSchedule.${idx}.date`, undefined);
-      } else {
-        setValue(`invoiceSchedule.${idx}.monthOffset`, undefined);
-      }
-    });
-  }, [rowModes]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const getMode = (fieldId: string, index: number): 'month' | 'date' => {
     if (fieldId in rowModes) return rowModes[fieldId];
     return schedule[index]?.date ? 'date' : 'month';
   };
 
-  const setMode = (fieldId: string, mode: 'month' | 'date') => {
+  const setMode = (fieldId: string, idx: number, mode: 'month' | 'date') => {
+    if (mode === 'month') {
+      setValue(`invoiceSchedule.${idx}.date`, undefined);
+    } else {
+      setValue(`invoiceSchedule.${idx}.monthOffset`, undefined);
+    }
     setRowModes((prev) => ({ ...prev, [fieldId]: mode }));
   };
 
@@ -80,6 +72,12 @@ export function RateStep({
       delete next[fieldId];
       return next;
     });
+  };
+
+  const handleScheduleModeChange = (mode: 'deposit' | 'milestones') => {
+    setValue('invoiceScheduleMode', mode);
+    setRowModes({});
+    replace([{ percentage: undefined as unknown as number }]);
   };
 
   const scheduleRootError =
@@ -111,121 +109,178 @@ export function RateStep({
       </Field>
 
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <Label>Invoicing Schedule</Label>
-          <span
-            className={cn(
-              'text-xs font-medium tabular-nums',
-              totalRounded === 100 ? 'text-green-600' : 'text-destructive',
-            )}
-          >
-            {totalRounded}% / 100%
-          </span>
-        </div>
+        <Label>Invoicing Schedule</Label>
 
-        {scheduleRootError && (
-          <p className="text-xs text-destructive">{scheduleRootError}</p>
-        )}
+        <CardSelect
+          legend="How would you like to set up invoicing?"
+          name="invoiceScheduleMode"
+          value={invoiceScheduleMode}
+          onChange={(v) => handleScheduleModeChange(v as 'deposit' | 'milestones')}
+          options={[
+            {
+              label: 'Deposit only',
+              value: 'deposit',
+              description: 'Record a deposit % for now',
+            },
+            {
+              label: 'Full schedule',
+              value: 'milestones',
+              description: 'Specify each invoice milestone',
+            },
+          ]}
+          cols={2}
+        />
 
-        {fields.map((field, index) => {
-          const mode = getMode(field.id, index);
-          const isLastRow = index === fields.length - 1;
-          const rowErrors =
-            attempted && Array.isArray(errors.invoiceSchedule)
-              ? errors.invoiceSchedule[index]
-              : undefined;
-          return (
-            <div
-              key={field.id}
-              className="flex flex-col gap-3 rounded-lg border border-border p-3"
+        {invoiceScheduleMode === 'deposit' ? (
+          <div className="rounded-lg border border-border p-3">
+            <Field
+              label="Deposit (%)"
+              required
+              error={
+                attempted && Array.isArray(errors.invoiceSchedule)
+                  ? errors.invoiceSchedule[0]?.percentage?.message
+                  : undefined
+              }
             >
-              <CardSelect
-                legend="Timing"
-                name={`invoiceSchedule-${index}-mode`}
-                value={mode}
-                onChange={(v) => setMode(field.id, v as 'month' | 'date')}
-                options={[
-                  { label: 'Month #', value: 'month' },
-                  { label: 'Exact date', value: 'date' },
-                ]}
-                cols={2}
-              />
+              <div className="relative flex items-center">
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  {...register('invoiceSchedule.0.percentage', {
+                    valueAsNumber: true,
+                  })}
+                  className="w-32 pr-6"
+                  placeholder="e.g. 50"
+                />
+                <span className="pointer-events-none absolute right-2 text-sm text-muted-foreground select-none">
+                  %
+                </span>
+              </div>
+            </Field>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                Milestones must total 100%
+              </span>
+              <span
+                className={cn(
+                  'text-xs font-medium tabular-nums',
+                  totalRounded === 100 ? 'text-green-600' : 'text-destructive',
+                )}
+              >
+                {totalRounded}% / 100%
+              </span>
+            </div>
 
-              <div className="flex items-start gap-3">
-                {mode === 'month' ? (
-                  <Field
-                    label="Month no."
-                    error={rowErrors?.monthOffset?.message}
-                  >
-                    {(() => {
-                      const { ref: rhfRef, ...monthProps } = register(
-                        `invoiceSchedule.${index}.monthOffset`,
-                        { valueAsNumber: true },
-                      );
-                      return (
+            {scheduleRootError && (
+              <p className="text-xs text-destructive">{scheduleRootError}</p>
+            )}
+
+            {fields.map((field, index) => {
+              const mode = getMode(field.id, index);
+              const isLastRow = index === fields.length - 1;
+              const rowErrors =
+                attempted && Array.isArray(errors.invoiceSchedule)
+                  ? errors.invoiceSchedule[index]
+                  : undefined;
+              return (
+                <div
+                  key={field.id}
+                  className="flex flex-col gap-3 rounded-lg border border-border p-3"
+                >
+                  <CardSelect
+                    legend="Timing"
+                    name={`invoiceSchedule-${index}-mode`}
+                    value={mode}
+                    onChange={(v) => setMode(field.id, index, v as 'month' | 'date')}
+                    options={[
+                      { label: 'Month #', value: 'month' },
+                      { label: 'Exact date', value: 'date' },
+                    ]}
+                    cols={2}
+                  />
+
+                  <div className="flex items-start gap-3">
+                    {mode === 'month' ? (
+                      <Field
+                        label="Month no."
+                        error={rowErrors?.monthOffset?.message}
+                      >
+                        {(() => {
+                          const { ref: rhfRef, ...monthProps } = register(
+                            `invoiceSchedule.${index}.monthOffset`,
+                            { valueAsNumber: true },
+                          );
+                          return (
+                            <Input
+                              type="number"
+                              min="1"
+                              {...monthProps}
+                              ref={(el) => {
+                                rhfRef(el);
+                                if (isLastRow) newRowRef.current = el;
+                              }}
+                              className="w-24"
+                              placeholder="e.g. 3"
+                            />
+                          );
+                        })()}
+                      </Field>
+                    ) : (
+                      <Field label="Date" error={rowErrors?.date?.message}>
+                        <Input
+                          type="date"
+                          {...register(`invoiceSchedule.${index}.date`)}
+                          className="w-40"
+                        />
+                      </Field>
+                    )}
+
+                    <Field label="%" required error={rowErrors?.percentage?.message}>
+                      <div className="relative flex items-center">
                         <Input
                           type="number"
-                          min="1"
-                          {...monthProps}
-                          ref={(el) => {
-                            rhfRef(el);
-                            if (isLastRow) newRowRef.current = el;
-                          }}
-                          className="w-24"
-                          placeholder="e.g. 3"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          {...register(`invoiceSchedule.${index}.percentage`, {
+                            valueAsNumber: true,
+                          })}
+                          className="w-24 pr-6"
+                          placeholder="25"
                         />
-                      );
-                    })()}
-                  </Field>
-                ) : (
-                  <Field label="Date" error={rowErrors?.date?.message}>
-                    <Input
-                      type="date"
-                      {...register(`invoiceSchedule.${index}.date`)}
-                      className="w-40"
-                    />
-                  </Field>
-                )}
+                        <span className="pointer-events-none absolute right-2 text-sm text-muted-foreground select-none">
+                          %
+                        </span>
+                      </div>
+                    </Field>
 
-                <Field label="%" required error={rowErrors?.percentage?.message}>
-                  <div className="relative flex items-center">
-                    <Input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      {...register(`invoiceSchedule.${index}.percentage`, {
-                        valueAsNumber: true,
-                      })}
-                      className="w-24 pr-6"
-                      placeholder="25"
-                    />
-                    <span className="pointer-events-none absolute right-2 text-sm text-muted-foreground select-none">
-                      %
-                    </span>
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-sm opacity-0 select-none" aria-hidden>x</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => removeRow(index, field.id)}
+                        aria-label="Remove milestone"
+                      >
+                        ✕
+                      </Button>
+                    </div>
                   </div>
-                </Field>
-
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-sm opacity-0 select-none" aria-hidden>x</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => removeRow(index, field.id)}
-                    aria-label="Remove milestone"
-                  >
-                    ✕
-                  </Button>
                 </div>
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
 
-        <Button type="button" variant="outline" onClick={addMilestone}>
-          Add Milestone
-        </Button>
+            <Button type="button" variant="outline" onClick={addMilestone}>
+              Add Milestone
+            </Button>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

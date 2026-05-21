@@ -39,6 +39,8 @@ model Order {
   projectDescription String?
   estimatedStartDate DateTime?
   estimatedEndDate   DateTime?
+  // Invoicing schedule mode: 'deposit' = single deposit %, 'milestones' = full schedule
+  invoiceScheduleMode String @default("milestones")
   // Display ID — human-readable reference shown in UI and emails (e.g. ID-1013)
   displayId   Int?     @unique
   // Metadata

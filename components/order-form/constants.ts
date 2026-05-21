@@ -49,6 +49,7 @@ export const NEW_ORDER_DEFAULTS: OrderFormValues = {
   hourlyRate: 110,
   additionalOngoingCosts: undefined,
   additionalOutcosts: undefined,
+  invoiceScheduleMode: 'milestones',
   invoiceSchedule: [],
   projectName: '',
   projectDescription: '',

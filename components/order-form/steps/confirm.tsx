@@ -121,6 +121,7 @@ export function ConfirmStep({
   const values = form.watch();
   const total = calculateOrderTotal(values);
   const schedule = values.invoiceSchedule;
+  const isDepositMode = values.invoiceScheduleMode === 'deposit';
   const [editingStep, setEditingStep] = React.useState<string | null>(null);
   const [saveAttempted, setSaveAttempted] = React.useState<string | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -271,7 +272,7 @@ export function ConfirmStep({
             <table className="w-full text-sm border border-border rounded-lg overflow-hidden">
               <thead>
                 <tr className="bg-muted/60 text-left">
-                  <th className="px-3 py-2 font-medium">Milestone</th>
+                  <th className="px-3 py-2 font-medium">{isDepositMode ? 'Invoice' : 'Milestone'}</th>
                   <th className="px-3 py-2 font-medium text-right">%</th>
                   <th className="px-3 py-2 font-medium text-right">Cost</th>
                 </tr>
@@ -280,11 +281,13 @@ export function ConfirmStep({
                 {schedule.map((item, idx) => (
                   <tr key={idx} className="border-t border-border">
                     <td className="px-3 py-2">
-                      {item.date
-                        ? new Date(item.date).toLocaleDateString('en-GB')
-                        : item.monthOffset
-                          ? `Month ${item.monthOffset}`
-                          : `Milestone ${idx + 1}`}
+                      {isDepositMode
+                        ? 'Deposit'
+                        : item.date
+                          ? new Date(item.date).toLocaleDateString('en-GB')
+                          : item.monthOffset
+                            ? `Month ${item.monthOffset}`
+                            : `Milestone ${idx + 1}`}
                     </td>
                     <td className="px-3 py-2 text-right">{item.percentage}%</td>
                     <td className="px-3 py-2 text-right">

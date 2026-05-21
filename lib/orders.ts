@@ -54,6 +54,7 @@ export function buildScalarFields(v: OrderFormValues) {
     hourlyRate: v.hourlyRate,
     additionalOngoingCosts: v.additionalOngoingCosts,
     additionalOutcosts: v.additionalOutcosts,
+    invoiceScheduleMode: v.invoiceScheduleMode,
     projectName: v.projectName || null,
     projectDescription: v.projectDescription || null,
     estimatedStartDate: v.estimatedStartDate
@@ -140,6 +141,7 @@ export function orderToFormValues(order: FullOrder): OrderFormValues {
     hourlyRate: order.hourlyRate,
     additionalOngoingCosts: order.additionalOngoingCosts ?? undefined,
     additionalOutcosts: order.additionalOutcosts ?? undefined,
+    invoiceScheduleMode: (order.invoiceScheduleMode as 'deposit' | 'milestones') ?? 'milestones',
     invoiceSchedule: order.invoiceSchedule.map((i) => ({
       monthOffset: i.monthOffset ?? undefined,
       date: i.date ? i.date.toISOString().split('T')[0] : undefined,

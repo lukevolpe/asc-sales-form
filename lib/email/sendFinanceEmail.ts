@@ -15,6 +15,7 @@ function buildHtml(params: {
   totalValue: number;
   submittedAt: Date;
   isAmended: boolean;
+  invoiceScheduleMode: string;
   invoiceSchedule: Array<{
     percentage: number;
     date: Date | null;
@@ -32,22 +33,25 @@ function buildHtml(params: {
     totalValue,
     submittedAt,
     isAmended,
+    invoiceScheduleMode,
     invoiceSchedule,
     appUrl,
   } = params;
+  const isDepositMode = invoiceScheduleMode === 'deposit';
 
   const displayRef = displayId != null ? `ID-${displayId}` : '—';
 
   const orderUrl = `${appUrl}/orders/${orderId}`;
 
   const scheduleRows = invoiceSchedule
-    .map((item) => {
-      const when =
-        item.date != null
+    .map((item, idx) => {
+      const when = isDepositMode
+        ? 'Deposit'
+        : item.date != null
           ? formatDate(item.date)
           : item.monthOffset != null
             ? `Month ${item.monthOffset}`
-            : '—';
+            : `Milestone ${idx + 1}`;
       const amount = formatCurrency((totalValue * item.percentage) / 100);
       return `
         <tr>
@@ -109,11 +113,11 @@ function buildHtml(params: {
 
   ${
     invoiceSchedule.length > 0
-      ? `<h3 style="color:#2C73D7;">Invoicing Schedule</h3>
+      ? `<h3 style="color:#2C73D7;">${isDepositMode ? 'Deposit' : 'Invoicing Schedule'}</h3>
   <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
     <thead>
       <tr>
-        <th style="padding:6px 10px;border:1px solid #ddd;background:#f5f5f5;text-align:left;">Date / Month</th>
+        <th style="padding:6px 10px;border:1px solid #ddd;background:#f5f5f5;text-align:left;">${isDepositMode ? 'Invoice' : 'Date / Month'}</th>
         <th style="padding:6px 10px;border:1px solid #ddd;background:#f5f5f5;text-align:left;">%</th>
         <th style="padding:6px 10px;border:1px solid #ddd;background:#f5f5f5;text-align:left;">Amount</th>
       </tr>
@@ -166,6 +170,7 @@ export async function sendFinanceEmail(
     totalValue,
     submittedAt: order.submittedAt,
     isAmended,
+    invoiceScheduleMode: order.invoiceScheduleMode,
     invoiceSchedule: order.invoiceSchedule,
     appUrl,
   });

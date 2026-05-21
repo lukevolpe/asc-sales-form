@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { cn } from '@/lib/utils';
 import { StepIndicator, type FormStep } from '@/components/step-indicator';
@@ -115,7 +115,7 @@ export function OrderForm({
     return () => sub.unsubscribe();
   }, [form, isEditMode]);
 
-  const isNewCustomer = form.watch('isNewCustomer');
+  const isNewCustomer = useWatch({ control: form.control, name: 'isNewCustomer' });
 
   const visibleSteps = ALL_STEPS.filter(
     (s) => s.id !== STEP_BILLING || isNewCustomer,

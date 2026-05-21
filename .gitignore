@@ -46,3 +46,4 @@ next-env.d.ts
 # Ralph agent loop logs
 logs/
 CURRENT-ISSUES.md
+.claude/settings.local.json
